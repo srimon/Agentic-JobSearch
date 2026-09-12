@@ -88,3 +88,20 @@ def test_monitoring_does_not_trace_itself(client,monkeypatch):
     monkeypatch.setattr(main.trace,'get_tracer',lambda *a:pytest.fail('Monitoring created a self trace'))
     assert client.get('/api/monitoring/phoenix/projects').status_code==200
     assert client.get('/api/monitoring-status/phoenix').status_code==200
+    monkeypatch.setattr(ui,'phoenix_displays',lambda hours:{'hours':hours})
+    assert client.get('/api/phoenix-graphql/displays').status_code==200
+
+def test_graphql_displays_require_operator_and_fixed_range(client,monkeypatch):
+    monkeypatch.setattr(ui,'phoenix_displays',lambda hours:{'hours':hours})
+    assert client.get('/api/phoenix-graphql/displays').status_code==401
+    app.dependency_overrides[current_user]=lambda:{'roles':['member']}
+    assert client.get('/api/phoenix-graphql/displays').status_code==403
+    app.dependency_overrides[current_user]=lambda:{'roles':['operator']}
+    assert client.get('/api/phoenix-graphql/displays').json()['hours']==24
+    assert client.get('/api/phoenix-graphql/displays?hours=168').json()['hours']==168
+    assert client.get('/api/phoenix-graphql/displays?hours=1').status_code==422
+
+def test_graphql_display_query_avoids_private_content():
+    assert 'input {' not in ui.DISPLAY_QUERY and 'output {' not in ui.DISPLAY_QUERY
+    assert 'attributes' not in ui.DISPLAY_QUERY and 'metadata' not in ui.DISPLAY_QUERY
+    assert 'sort: {col: startTime, dir: desc}' in ui.DISPLAY_QUERY

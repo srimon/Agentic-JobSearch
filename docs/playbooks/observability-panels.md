@@ -6,7 +6,7 @@ Open `http://localhost:3105/?view=observability` with a Jobsearch operator or ad
 
 - Grafana: Operations, API & Services, Collection & Decisions, Sources & Queue, and Logs. New dashboards default to 24 hours, refresh every 15 seconds, and support the real time picker, legends and panel drilldowns.
 - Prometheus: preselected API traffic, latency, collection outcomes and queue graphs; query editor; targets; alerts; rules. Recording rules reference actual Jobsearch metrics.
-- Phoenix: Projects & traces and the native GraphiQL explorer. Select the `jobsearch` project to inspect its execution traces. Monitoring asset/query traffic is excluded from new application traces so it does not drown out agent activity. Historical spans are not rewritten. The current collector records a source collection span, not an LLM conversation or proof of application submission.
+- Phoenix: GraphQL displays, Projects & traces, and the native GraphiQL explorer. The GraphQL display is the default Phoenix screen and provides 24-hour or 7-day summary cards, span volume, trace outcomes, latency percentiles, and the ten latest root operations. Select the `jobsearch` project in Projects & traces for the complete vendor interface. Monitoring asset/query traffic is excluded from new application traces so it does not drown out agent activity. Historical spans are not rewritten. The current collector records a source collection span, not an LLM conversation or proof of application submission.
 - Expand enlarges the embedded interface; Reload returns to the selected screen; Open full view opens the same authenticated route separately.
 
 Readiness is checked on arrival and every 15 seconds. A starting or unavailable service shows a retry message instead of an empty frame. Phoenix initialization may take about 90 seconds. Revoked or expired sessions lose access on the next check/request.
@@ -19,7 +19,9 @@ Logs are allowlisted structured telemetry from Jobsearch, not unrestricted Docke
 
 ## GraphQL
 
-The authenticated endpoint is `/api/monitoring/phoenix/graphql`. The GraphQL explorer opens Phoenix's native Strawberry GraphiQL with a starter query:
+The fixed display endpoint is `/api/phoenix-graphql/displays`; it accepts only `hours=24` or `hours=168`, executes a version-controlled query against the isolated `jobsearch` project, and returns a small allowlisted response. It never requests span inputs, outputs, attributes, metadata, resume contents, demographic answers, prompts, or scraped job text.
+
+The authenticated explorer endpoint is `/api/monitoring/phoenix/graphql`. Phoenix's native Strawberry GraphiQL opens with a starter query:
 
 ```graphql
 query JobsearchProjects {

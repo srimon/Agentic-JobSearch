@@ -261,7 +261,7 @@ def audit_events(user=Depends(operator)):
 @app.middleware('http')
 async def observe(request, call_next):
     # Do not turn every monitoring asset/query into a new Phoenix trace.
-    if request.url.path in ('/api/health','/api/session') or request.url.path.startswith(('/api/monitoring/', '/api/monitoring-status/', '/api/observability/')):
+    if request.url.path in ('/api/health','/api/session') or request.url.path.startswith(('/api/monitoring/', '/api/monitoring-status/', '/api/observability/', '/api/phoenix-graphql/')):
         return await call_next(request)
     started=time.monotonic()
     with trace.get_tracer('jobsearch').start_as_current_span('http.request',record_exception=False,set_status_on_exception=False) as span:
