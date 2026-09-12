@@ -1,0 +1,10 @@
+.secrets
+.env*
+JBS
+.venv
+logs
+work
+.git
+frontend/node_modules
+frontend/.next
+__pycache__

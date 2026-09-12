@@ -1,0 +1,14 @@
+{
+  "library_containers_unchanged": 14,
+  "jobsearch_services_healthy": 3,
+  "host_ports_published": 0,
+  "shared_networks_or_mounts": 0,
+  "internal_network": true,
+  "resource_limits_verified": true,
+  "qdrant_auth_required": true,
+  "redis_auth_required": true,
+  "postgres_authenticated": true,
+  "systemd_enabled": true,
+  "systemd_active": true,
+  "limits": "Jobsearch-only stop/start tested. Full WSL shutdown not tested to avoid interrupting the library."
+}

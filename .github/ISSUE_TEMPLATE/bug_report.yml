@@ -1,0 +1,10 @@
+name: Bug report
+description: Report a reproducible issue without personal data or credentials.
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Include expected behavior and reproduction steps. Remove private applicant information.
+    validations:
+      required: true

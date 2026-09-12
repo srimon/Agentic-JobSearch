@@ -1,0 +1,26 @@
+[Unit]
+Description=Jobsearch isolated Docker Compose stack
+Requires=docker.service
+After=docker.service
+PartOf=docker.service
+RequiresMountsFor=/home/srimonadi/Jobsearch
+ConditionPathExists=/home/srimonadi/Jobsearch/compose.yaml
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=srimonadi
+Group=srimonadi
+SupplementaryGroups=docker
+WorkingDirectory=/home/srimonadi/Jobsearch
+ExecStart=/home/srimonadi/Jobsearch/startupdocker.sh
+ExecStop=/home/srimonadi/Jobsearch/stopdocker.sh
+ExecStopPost=/home/srimonadi/Jobsearch/stopdocker.sh
+TimeoutStartSec=180
+TimeoutStopSec=150
+UMask=0077
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

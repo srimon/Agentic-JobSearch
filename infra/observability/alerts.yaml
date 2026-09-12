@@ -1,0 +1,22 @@
+groups:
+  - name: jobsearch
+    rules:
+      - alert: JobsearchTargetDown
+        expr: up == 0
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Jobsearch telemetry target is unavailable"}
+      - alert: JobsearchSourceStale
+        expr: time() - jobsearch_source_last_success_seconds > 28800
+        for: 5m
+        labels: {severity: warning}
+        annotations: {summary: "Source has no successful collection in eight hours"}
+      - alert: JobsearchWorkerStalled
+        expr: time() - jobsearch_worker_heartbeat_seconds > 600
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Collector has stopped reporting progress"}
+      - alert: JobsearchDatabaseMetricsUnavailable
+        expr: jobsearch_database_metrics_up == 0
+        for: 2m
+        annotations: {summary: "Database-backed metrics cannot be collected"}

@@ -1,0 +1,13 @@
+# Jobsearch observability
+
+Grafana: http://localhost:3106, username admin. Its password is separate from the Jobsearch account password. Retrieve it privately in your own WSL terminal with `cat .secrets/grafana_password` from the project root; do not paste it into chat. Change it through Grafana's profile password settings if desired. The stored bootstrap file is not automatically updated by a UI password change.
+
+Open Dashboards > Jobsearch > Jobsearch Operations. Ten panels cover current matches, enabled sources, queue depth, API/worker availability, HTTP latency, run outcomes, decision totals, source freshness, active Prometheus alerts and sanitized application logs. Explore > Jobsearch Tempo can retrieve a Trace ID shown in the application's collection-status panel.
+
+Jobsearch uses separate OTel Collector, Prometheus, Grafana, Loki, Tempo and Alloy containers, volumes and credentials. Only Grafana publishes a port, bound to localhost. No Docker socket, host log directory, or chromadb volume is mounted. API/worker emit explicit telemetry fields only; request bodies, headers, session cookies, passwords, SQL and scraped content are excluded. Auth audit records remain in PostgreSQL, separate from diagnostic logs.
+
+Retention: Prometheus seven days or 1 GiB; Loki seven days; Tempo three days; application JSONL files rotate at 5 MiB with three backups per service. Loki/Tempo retention limits age, not total disk size. Images are pinned by digest in observability Dockerfiles, reusing installed layers where compatible; the BusyBox musl probe helper is version-tagged. Resource caps total roughly 2 GiB for the six new containers, but CPU and disk remain shared host resources.
+
+Alerts are evaluated locally in Prometheus and visible through Grafana. No email, Slack, or other external delivery is configured. Health checks validate process endpoints; pipeline ingestion must be verified separately. Health status alone does not automatically restart an unhealthy container. Standard Jobsearch startup/shutdown checks discover all twelve services.
+
+Phoenix is deferred until model-based agent workflows are introduced. No LLM prompt/response evaluation, Qdrant retrieval evaluation, or secured A2A tracing is claimed. Current traces cover API requests and source collection; the database run ID and trace ID correlate these records. These traces do not yet form a parent-child chain from HTTP enqueue through asynchronous worker processing. Completed run totals are durable in PostgreSQL; Prometheus counters reset when a process restarts. Decisions are mutually exclusive; unknown original dates remain unknown.

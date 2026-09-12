@@ -1,0 +1,2 @@
+FROM grafana/tempo@sha256:9371af1b75b4e057eb77f22dc4dd4d9176cd6985e29f181527be6723b7f29c41
+COPY --from=busybox:1.37-musl /bin/busybox /busybox

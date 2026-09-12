@@ -1,0 +1,2 @@
+FROM otel/opentelemetry-collector-contrib@sha256:799dc6cf12c96192af37b5bdba804da8c10b3bc563b43cb90c3f3c58d9572ad6
+COPY --from=busybox:1.37-musl /bin/busybox /busybox

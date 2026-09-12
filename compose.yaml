@@ -1,0 +1,273 @@
+name: jobsearch
+
+x-runtime: &runtime
+  restart: unless-stopped
+  stop_grace_period: 60s
+  networks: [data]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  postgres:
+    <<: *runtime
+    image: pgvector/pgvector@sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f
+    cpus: 0.5
+    mem_limit: 512m
+    environment:
+      POSTGRES_USER: jobsearch_owner
+      POSTGRES_DB: jobsearch
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U jobsearch_owner -d jobsearch"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  qdrant:
+    <<: *runtime
+    image: qdrant/qdrant@sha256:12364fe851b9f17356fc88189fc06d1b521262e04659ec7345975b00c9246a10
+    cpus: 0.5
+    mem_limit: 1g
+    environment:
+      QDRANT__TELEMETRY_DISABLED: "true"
+    volumes:
+      - qdrant_data:/qdrant/storage
+      - ./.secrets/qdrant.yaml:/qdrant/config/production.yaml:ro
+    healthcheck:
+      test: [CMD-SHELL, "bash -c 'exec 3<>/dev/tcp/127.0.0.1/6333' > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  redis:
+    <<: *runtime
+    image: redis@sha256:ff02b58f971e7d7d156a1267e283fcbbeee91773b6aa36c49dac28ecfe28eadf
+    cpus: 0.5
+    mem_limit: 256m
+    command: [redis-server, /usr/local/etc/redis/redis.conf]
+    volumes:
+      - redis_data:/data
+      - ./.secrets/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    healthcheck:
+      test: [CMD-SHELL, "REDISCLI_AUTH=$$(sed -n 's/^requirepass //p' /usr/local/etc/redis/redis.conf) redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  api:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    cpus: 1
+    mem_limit: 512m
+    env_file: [.secrets/local_auth.env]
+    environment: {JOBSEARCH_TELEMETRY: "true"}
+    volumes: [telemetry_logs:/app/telemetry, ./.secrets/intake_key:/run/secrets/intake_key:ro]
+    networks: [data, observability]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/api/health',timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  worker:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.api
+    command: [python, -m, ai_core.agents.supervisor]
+    cpus: 0.5
+    mem_limit: 384m
+    networks: [data, collector_egress, observability]
+    env_file: [.secrets/worker.env]
+    environment: {JOBSEARCH_TELEMETRY: "true"}
+    volumes: [telemetry_logs:/app/telemetry]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, python, -c, "import os,time; assert time.time()-os.stat('/tmp/jobsearch-worker-heartbeat').st_mtime<600"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  web:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.web
+    cpus: 1
+    mem_limit: 512m
+    networks: [data, frontend]
+    ports: ["127.0.0.1:3105:3105"]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3105/api/session').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  otel:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: infra/observability/Dockerfile.otel
+    networks: [observability]
+    cpus: 0.5
+    mem_limit: 256m
+    command: [--config=/etc/otel/config.yaml]
+    volumes:
+      - ./infra/observability/otel.yaml:/etc/otel/config.yaml:ro
+    healthcheck:
+      test: [CMD, /busybox, wget, -q, -O, /dev/null, http://127.0.0.1:13133/]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  tempo:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: infra/observability/Dockerfile.tempo
+    networks: [observability]
+    cpus: 0.5
+    mem_limit: 512m
+    command: [-config.file=/etc/tempo.yaml]
+    volumes:
+      - ./infra/observability/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    healthcheck:
+      test: [CMD, /busybox, wget, -q, -O, /dev/null, http://127.0.0.1:3200/ready]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  loki:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: infra/observability/Dockerfile.loki
+    networks: [observability]
+    cpus: 0.5
+    mem_limit: 384m
+    command: [-config.file=/etc/loki.yaml]
+    volumes:
+      - ./infra/observability/loki.yaml:/etc/loki.yaml:ro
+      - loki_data:/loki
+    healthcheck:
+      test: [CMD, /busybox, wget, -q, -O, /dev/null, http://127.0.0.1:3100/ready]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  prometheus:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: infra/observability/Dockerfile.prometheus
+    networks: [observability]
+    cpus: 0.5
+    mem_limit: 256m
+    command: [--config.file=/etc/prometheus/prometheus.yaml, --storage.tsdb.path=/prometheus, --storage.tsdb.retention.time=7d, --storage.tsdb.retention.size=1GB]
+    volumes:
+      - ./infra/observability/prometheus.yaml:/etc/prometheus/prometheus.yaml:ro
+      - ./infra/observability/alerts.yaml:/etc/prometheus/alerts.yaml:ro
+      - prometheus_data:/prometheus
+    healthcheck:
+      test: [CMD, /busybox, wget, -q, -O, /dev/null, http://127.0.0.1:9090/-/ready]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  grafana:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: infra/observability/Dockerfile.grafana
+    networks: [observability, frontend]
+    cpus: 0.5
+    mem_limit: 384m
+    volumes:
+      - ./infra/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+      - ./.secrets/grafana_password:/run/secrets/admin_password:ro
+    ports: ["127.0.0.1:3106:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/admin_password
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    healthcheck:
+      test: [CMD, /busybox, wget, -q, -O, /dev/null, http://127.0.0.1:3000/api/health]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  alloy:
+    <<: *runtime
+    build:
+      context: .
+      dockerfile: infra/observability/Dockerfile.alloy
+    networks: [observability]
+    cpus: 0.5
+    mem_limit: 256m
+    command: [run, /etc/alloy/config.alloy, --storage.path=/var/lib/alloy, --server.http.listen-addr=0.0.0.0:12345]
+    volumes:
+      - ./infra/observability/alloy.alloy:/etc/alloy/config.alloy:ro
+      - telemetry_logs:/logs:ro
+      - alloy_data:/var/lib/alloy
+    healthcheck:
+      test: [CMD, /busybox, wget, -q, -O, /dev/null, http://127.0.0.1:12345/-/ready]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+networks:
+  observability:
+    internal: true
+  collector_egress:
+  frontend:
+  data:
+    internal: true
+
+volumes:
+  telemetry_logs:
+  tempo_data:
+  loki_data:
+  prometheus_data:
+  grafana_data:
+  alloy_data:
+  postgres_data:
+  qdrant_data:
+  redis_data:
+
+secrets:
+  postgres_password:
+    file: ./.secrets/postgres_password

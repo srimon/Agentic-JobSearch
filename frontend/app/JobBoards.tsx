@@ -1,0 +1,12 @@
+export default function JobBoards(){
+ const boards=[
+ {name:'Craigslist',status:'Regional search links only - automated ingestion not connected',detail:'Choose your US city or region to browse jobs and configure native search alerts. Automated content collection requires permission under Craigslist terms.',url:'https://www.craigslist.org/about/sites#US'},
+ {name:'Google',status:'Search link only — automated ingestion not connected',detail:'Google job discovery is available through its website. Custom Search JSON API is closed to new customers; no paid search service is configured.',url:'https://www.google.com/search?q=director+data+engineering+jobs+United+States'},
+ {name:'Jobicy',status:'Public feed connected',detail:'Latest 200 US remote jobs, with source attribution. Scheduled every six hours.',url:'https://jobicy.com/jobs'},
+ {name:'Remotive',status:'Public feed connected',detail:'Remote job feed with a 24-hour publication delay. Checked at most once every six hours.',url:'https://remotive.com'},
+ {name:'Dice',status:'Automated search connected',detail:'Public MCP search. US leadership queries; up to 200 results per query per run. Duplicates are removed within the source.',url:'https://www.dice.com/jobs'},
+ {name:'Indeed',status:'Search link only — automated ingestion not connected',detail:'Partner-approved API access and credentials are required for the documented search integration.',url:'https://www.indeed.com/jobs?q=director+data+engineering&l=United+States'},
+ {name:'LinkedIn',status:'Search link only — automated ingestion not connected',detail:'A general job-search data integration has not been configured. The job-posting API is not a replacement.',url:'https://www.linkedin.com/jobs/search/?keywords=Director%20Data%20Engineering&location=United%20States'},
+ {name:'Monster',status:'Search link only — automated ingestion not connected',detail:'No supported public search API has been verified. Requires an approved feed or integration.',url:'https://www.monster.com/jobs'}];
+ return <section className="collection-panel"><h2>Job-board integrations</h2>{boards.map(b=><div key={b.name} className="collection-source"><strong>{b.name}</strong><span>{b.status}</span><small>{b.detail}</small><a href={b.url} target="_blank" rel="noopener noreferrer">Open {b.name} search ↗</a></div>)}</section>
+}

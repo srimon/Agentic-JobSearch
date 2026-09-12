@@ -1,0 +1,2 @@
+FROM grafana/grafana@sha256:f772d434e8fab0049deb2b1b30abd43342bcfca1537614aa8d36080232cf4283
+COPY --from=busybox:1.37-musl /bin/busybox /busybox

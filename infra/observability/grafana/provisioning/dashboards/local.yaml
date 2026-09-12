@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: Jobsearch
+    folder: Jobsearch
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards
