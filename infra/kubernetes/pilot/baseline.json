@@ -1,0 +1,198 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "ai-hub-pilot",
+        "labels": {
+          "app.kubernetes.io/part-of": "ai-hub-pilot",
+          "pod-security.kubernetes.io/enforce": "restricted",
+          "pod-security.kubernetes.io/enforce-version": "v1.35",
+          "pod-security.kubernetes.io/audit": "restricted",
+          "pod-security.kubernetes.io/warn": "restricted"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "ai-hub-pilot"
+      },
+      "automountServiceAccountToken": false
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "pilot-workload",
+        "namespace": "ai-hub-pilot"
+      },
+      "automountServiceAccountToken": false
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "default-deny",
+        "namespace": "ai-hub-pilot"
+      },
+      "spec": {
+        "podSelector": {},
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ],
+        "ingress": [],
+        "egress": []
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ResourceQuota",
+      "metadata": {
+        "name": "pilot-budget",
+        "namespace": "ai-hub-pilot"
+      },
+      "spec": {
+        "hard": {
+          "requests.cpu": "500m",
+          "requests.memory": "512Mi",
+          "limits.cpu": "1",
+          "limits.memory": "1Gi",
+          "pods": "6",
+          "persistentvolumeclaims": "0",
+          "services.loadbalancers": "0",
+          "services.nodeports": "0"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "LimitRange",
+      "metadata": {
+        "name": "container-defaults",
+        "namespace": "ai-hub-pilot"
+      },
+      "spec": {
+        "limits": [
+          {
+            "type": "Container",
+            "default": {
+              "cpu": "250m",
+              "memory": "256Mi"
+            },
+            "defaultRequest": {
+              "cpu": "100m",
+              "memory": "128Mi"
+            },
+            "max": {
+              "cpu": "1",
+              "memory": "512Mi"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "name": "jobsearch-pilot",
+        "labels": {
+          "app.kubernetes.io/part-of": "ai-hub-pilot",
+          "pod-security.kubernetes.io/enforce": "restricted",
+          "pod-security.kubernetes.io/enforce-version": "v1.35",
+          "pod-security.kubernetes.io/audit": "restricted",
+          "pod-security.kubernetes.io/warn": "restricted"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "default",
+        "namespace": "jobsearch-pilot"
+      },
+      "automountServiceAccountToken": false
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ServiceAccount",
+      "metadata": {
+        "name": "pilot-workload",
+        "namespace": "jobsearch-pilot"
+      },
+      "automountServiceAccountToken": false
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "default-deny",
+        "namespace": "jobsearch-pilot"
+      },
+      "spec": {
+        "podSelector": {},
+        "policyTypes": [
+          "Ingress",
+          "Egress"
+        ],
+        "ingress": [],
+        "egress": []
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "ResourceQuota",
+      "metadata": {
+        "name": "pilot-budget",
+        "namespace": "jobsearch-pilot"
+      },
+      "spec": {
+        "hard": {
+          "requests.cpu": "500m",
+          "requests.memory": "512Mi",
+          "limits.cpu": "1",
+          "limits.memory": "1Gi",
+          "pods": "6",
+          "persistentvolumeclaims": "0",
+          "services.loadbalancers": "0",
+          "services.nodeports": "0"
+        }
+      }
+    },
+    {
+      "apiVersion": "v1",
+      "kind": "LimitRange",
+      "metadata": {
+        "name": "container-defaults",
+        "namespace": "jobsearch-pilot"
+      },
+      "spec": {
+        "limits": [
+          {
+            "type": "Container",
+            "default": {
+              "cpu": "250m",
+              "memory": "256Mi"
+            },
+            "defaultRequest": {
+              "cpu": "100m",
+              "memory": "128Mi"
+            },
+            "max": {
+              "cpu": "1",
+              "memory": "512Mi"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -135,3 +135,8 @@ This milestone delivers an inventory and design only. No Kubernetes resources, s
 ## Pilot preflight observation — 2026-09-12 UTC
 
 The read-only preflight found 14 healthy Jobsearch containers. Docker reported 16 CPUs and 33,504,272,384 bytes of memory capacity (~31.2 GiB). The WSL filesystem reported about 848 GiB available. These are not measurements of spare physical host resources. kubectl, kind, k3d, k3s and helm were absent from PATH. No cluster was installed or contacted, and no services or schedules were changed. Four isolated preflight tests passed, including unavailable inventory, health ambiguity, command scope and error redaction. This completes a repeatable local inventory check, not the capacity, staging or production migration gates.
+
+
+## Pilot configuration prepared — 2026-09-12 UTC
+
+See `../infra/kubernetes/pilot/README.md` for the measured Windows/WSL snapshot, proposed ports, initial k3d/K3s choice, 4 GiB node limit, stateless namespace security baseline and installation gates. Configuration is prepared only; no cluster or resources have been deployed. The initial pilot has no PVCs or application credentials. Real NetworkPolicy enforcement and server-side admission tests remain required.
