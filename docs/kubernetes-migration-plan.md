@@ -120,9 +120,12 @@ Rollback before new writes can restore routing to the old deployment. After new 
 
 ## Git and completion
 
-Keep this discovery plan in the existing Jobsearch repository. A future AIHub repository will contain the platform implementation; neither application repository is merged by this document. Commit reviewed documentation and code increments without credentials or runtime data, push, and verify remote commit identity.
+Keep this migration plan in the existing Jobsearch repository. The Enterprise AI Hub repository contains the platform implementation; the application repositories remain independent. Commit reviewed documentation and code increments without credentials or runtime data, push, and verify remote commit identity.
 
-This milestone delivers an inventory and design only. No Kubernetes resources, shared databases, worker concurrency changes or library modifications have been deployed.
+The current milestone includes an isolated Kubernetes stage with an empty,
+ephemeral PostgreSQL database plus one API and one web replica. It does not
+include production data, accounts, schedulers, workers, email delivery, employer
+submissions, shared databases, worker concurrency changes or library changes.
 
 ## Technical references
 
@@ -139,9 +142,16 @@ The read-only preflight found 14 healthy Jobsearch containers. Docker reported 1
 
 ## Pilot configuration prepared — 2026-09-12 UTC
 
-See [Enterprise AI Hub pilot README](https://github.com/srimon/Enterprise-AI-Hub/blob/main/infra/kubernetes/pilot/README.md) for the measured Windows/WSL snapshot, proposed ports, initial k3d/K3s choice, 4 GiB node limit, stateless namespace security baseline and installation gates. Configuration is prepared only; no cluster or resources have been deployed. The initial pilot has no PVCs or application credentials. Real NetworkPolicy enforcement and server-side admission tests remain required.
+See [Enterprise AI Hub pilot README](https://github.com/srimon/Enterprise-AI-Hub/blob/main/infra/kubernetes/pilot/README.md) for the measured Windows/WSL snapshot, reserved ports, k3d/K3s choice and 4 GiB node limit. The local pilot is now deployed with restricted Pod Security, default-deny NetworkPolicy, resource quotas and disabled service-account token automount. Runtime admission, cross-namespace denial and quota checks passed. The pilot uses no PVCs; staging credentials are generated locally outside Git.
 
 
 ## Platform repository established
 
-The private repository https://github.com/srimon/Enterprise-AI-Hub now owns pilot configuration and GPU readiness source. Its initial commit is a2a83c1d6f20cd720a59d17b7acd1a8247a05cd0, imported from Jobsearch a7bafea1c18830ea9936445058b35f117fe434b6. Copies were compared before removal here. Jobsearch retains its migration integration plan and application readiness script; the hub does not contain application code, data, credentials or running state. Runtime ownership is unchanged.
+The private repository https://github.com/srimon/Enterprise-AI-Hub now owns pilot configuration and GPU readiness source. Its initial commit is a2a83c1d6f20cd720a59d17b7acd1a8247a05cd0, imported from Jobsearch a7bafea1c18830ea9936445058b35f117fe434b6. Copies were compared before removal here. Jobsearch retains its migration integration plan and application readiness script; the hub does not contain application source, production data or credentials.
+
+The Hub stage builds from exact Jobsearch commit `3d48b9b`. It is reachable on
+loopback at `http://localhost:3185` and uses synthetic/empty state. Production
+Compose remains the sole runtime owner at `http://localhost:3105`; all 14
+production services remained healthy through staging deployment. Scheduler and
+worker ownership has not moved. The next gate is an isolated backup/restore and
+functional test rehearsal before any single-writer cutover is considered.
