@@ -19,3 +19,11 @@
 - Archived owner decisions are immutable. Never restore, reapply or include archived jobs in future reports. Canonical URL matches inherit the archive lock.
 
 - Use owner feedback ranking for recommended ordering and report prioritization. Read docs/playbooks/feedback-learning.md. Learning never modifies eligibility, archives, privacy or submission authority. Do not infer preferences from generic rejections or protected attributes.
+
+## Required GitHub workflow
+
+- The user has given standing authorization to commit and push future Jobsearch code changes, including configuration and documentation, to `git@github.com:srimon/Agentic-JobSearch.git`. Do not ask for confirmation again for routine commits and pushes within the requested task.
+- After completing each coherent change, run relevant checks, review the diff and staged files for credentials and private data, commit with a descriptive message, and push to the corresponding branch on origin before reporting completion. Use main unless the user or the task requires another branch.
+- Preserve unrelated work and remote history. Do not force-push, overwrite remote changes, or include unrelated modifications merely to make the working tree clean.
+- Never commit credentials, environment secrets, private keys, resumes, private intake/application data, runtime databases, logs, virtual environments, or generated build files. Maintain the ignore rules.
+- Verify that the pushed remote branch contains the commit. Report the commit and validation results; if checks, authentication, conflicts, or branch protection prevent completion, clearly report what remains uncommitted or unpushed rather than claiming GitHub is synchronized.
