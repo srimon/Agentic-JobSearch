@@ -139,4 +139,9 @@ The read-only preflight found 14 healthy Jobsearch containers. Docker reported 1
 
 ## Pilot configuration prepared — 2026-09-12 UTC
 
-See `../infra/kubernetes/pilot/README.md` for the measured Windows/WSL snapshot, proposed ports, initial k3d/K3s choice, 4 GiB node limit, stateless namespace security baseline and installation gates. Configuration is prepared only; no cluster or resources have been deployed. The initial pilot has no PVCs or application credentials. Real NetworkPolicy enforcement and server-side admission tests remain required.
+See [Enterprise AI Hub pilot README](https://github.com/srimon/Enterprise-AI-Hub/blob/main/infra/kubernetes/pilot/README.md) for the measured Windows/WSL snapshot, proposed ports, initial k3d/K3s choice, 4 GiB node limit, stateless namespace security baseline and installation gates. Configuration is prepared only; no cluster or resources have been deployed. The initial pilot has no PVCs or application credentials. Real NetworkPolicy enforcement and server-side admission tests remain required.
+
+
+## Platform repository established
+
+The private repository https://github.com/srimon/Enterprise-AI-Hub now owns pilot configuration and GPU readiness source. Its initial commit is a2a83c1d6f20cd720a59d17b7acd1a8247a05cd0, imported from Jobsearch a7bafea1c18830ea9936445058b35f117fe434b6. Copies were compared before removal here. Jobsearch retains its migration integration plan and application readiness script; the hub does not contain application code, data, credentials or running state. Runtime ownership is unchanged.
