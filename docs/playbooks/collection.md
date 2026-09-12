@@ -20,4 +20,4 @@ Specialized scientific discovery/design titles (such as AIRx Director, Computati
 
 ## Worker scaling source update
 
-Leased worker and standalone scheduler implementation is available for staging; the production collector has not been cut over. Read [worker leases](worker-leases.md) before rebuilding or deploying the collector. Migration 013, the opt-in Compose overlay, lifecycle integration and a controlled drain are required. The earlier combined-worker description above describes the existing deployment.
+Leased worker and standalone scheduler were deployed on 2026-09-12 UTC with one worker. Read [worker leases](worker-leases.md) before rebuilding or deploying the collector. Migration 013, the opt-in Compose overlay, lifecycle integration and a controlled drain are required. The earlier combined-worker description above describes the superseded deployment.

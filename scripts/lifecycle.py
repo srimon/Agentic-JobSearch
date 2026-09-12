@@ -16,7 +16,7 @@ import uuid
 import urllib.request
 
 ROOT = Path('/home/srimonadi/Jobsearch')
-COMPOSE = ['/usr/bin/docker', 'compose', '--project-directory', str(ROOT), '-p', 'jobsearch', '-f', str(ROOT / 'compose.yaml')]
+COMPOSE = ['/usr/bin/docker', 'compose', '--project-directory', str(ROOT), '-p', 'jobsearch', '-f', str(ROOT / 'compose.yaml'), '-f', str(ROOT / 'compose.worker-leases.yaml')]
 LOG = logging.getLogger('jobsearch.lifecycle')
 RUN_ID = str(uuid.uuid4())
 
@@ -55,10 +55,19 @@ def command(args, timeout=15):
 
 
 def expected_services():
-    names = command(COMPOSE + ['config', '--services']).split()
-    if not names:
+    # Parse locally; never log the resolved config because it contains env secrets.
+    config = json.loads(command(COMPOSE + ['config', '--format', 'json']))
+    services = config.get('services', {})
+    if not services:
         raise LifecycleError('no_configured_services')
-    return set(names)
+    expected = {}
+    for name, spec in services.items():
+        replicas = spec.get('deploy', {}).get('replicas', 1)
+        if isinstance(replicas, bool) or not isinstance(replicas, int) or replicas < 1:
+            raise LifecycleError('invalid_replica_count')
+        expected[name] = replicas
+    return expected
+
 
 
 def inspect_project():
@@ -69,6 +78,8 @@ def inspect_project():
     result = []
     for item in raw:
         labels = item['Config'].get('Labels') or {}
+        if str(labels.get('com.docker.compose.oneoff','false')).lower() == 'true':
+            continue
         state = item['State']
         result.append({'service': labels.get('com.docker.compose.service', ''), 'container': item['Name'].lstrip('/'),
             'id': item['Id'][:12], 'status': state['Status'], 'running': state['Running'],
@@ -83,8 +94,9 @@ def state_errors(services, expected, desired):
     counts = Counter(x['service'] for x in services)
     if desired == 'running':
         for name in sorted(expected):
-            if counts[name] != 1:
-                errors.append(f'{name}:expected_one_container')
+            replicas = expected[name] if isinstance(expected, dict) else 1
+            if counts[name] != replicas:
+                errors.append(f'{name}:expected_{replicas}_containers')
         for item in services:
             if item['service'] not in expected:
                 errors.append(item['service']+':unexpected_service')
@@ -158,8 +170,8 @@ def execute(action, desired='running'):
             command(COMPOSE+['up','-d','--wait','--wait-timeout','120'], timeout=140)
             desired = 'running'
         elif action == 'stop':
-            event('stop_requested', grace_seconds=60)
-            command(COMPOSE+['stop','--timeout','60'], timeout=90)
+            event('stop_requested', grace_seconds=75)
+            command(COMPOSE+['stop','--timeout','75'], timeout=120)
             desired = 'stopped'
         services = inspect_project()
         errors = state_errors(services, expected, desired)

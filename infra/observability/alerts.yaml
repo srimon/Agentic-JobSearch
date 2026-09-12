@@ -12,7 +12,7 @@ groups:
         labels: {severity: warning}
         annotations: {summary: "Source has no successful collection in eight hours"}
       - alert: JobsearchWorkerStalled
-        expr: time() - jobsearch_worker_heartbeat_seconds > 600
+        expr: time() - jobsearch_worker_heartbeat_seconds{job="jobsearch-worker"} > 1020
         for: 2m
         labels: {severity: critical}
         annotations: {summary: "Collector has stopped reporting progress"}
@@ -20,3 +20,8 @@ groups:
         expr: jobsearch_database_metrics_up == 0
         for: 2m
         annotations: {summary: "Database-backed metrics cannot be collected"}
+      - alert: JobsearchSchedulerStalled
+        expr: time() - jobsearch_scheduler_heartbeat_seconds{job="jobsearch-scheduler"} > 120
+        for: 2m
+        labels: {severity: critical}
+        annotations: {summary: "Scheduler has stopped completing scheduling passes"}

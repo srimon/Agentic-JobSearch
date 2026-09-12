@@ -33,6 +33,21 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(module.state_errors([service(running=False,status='exited',exit_code=143)],{'postgres'},'stopped'),[])
         self.assertEqual(module.state_errors([],{'postgres'},'stopped'),[])
 
+    def test_explicit_worker_replicas_all_must_be_healthy(self):
+        workers=[service(service='worker'),service(service='worker')]
+        self.assertEqual(module.state_errors(workers,{'worker':2},'running'),[])
+        self.assertTrue(module.state_errors(workers[:1],{'worker':2},'running'))
+        workers[1]['health']='unhealthy'
+        self.assertTrue(module.state_errors(workers,{'worker':2},'running'))
+
+    @patch.object(module,'command',return_value='{"services":{"worker":{"deploy":{"replicas":2}},"scheduler":{}}}')
+    def test_expected_replica_config(self,command):
+        self.assertEqual(module.expected_services(),{'worker':2,'scheduler':1})
+
+    @patch.object(module,'command',return_value='{"services":{"worker":{"deploy":{"replicas":0}}}}')
+    def test_invalid_replica_config(self,command):
+        with self.assertRaises(module.LifecycleError): module.expected_services()
+
     @patch.object(module,'save_status')
     @patch.object(module,'event')
     @patch.object(module,'inspect_project',return_value=[])

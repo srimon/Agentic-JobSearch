@@ -8,3 +8,8 @@ work
 frontend/node_modules
 frontend/.next
 __pycache__
+
+data
+backups
+*.pdf
+*.docx

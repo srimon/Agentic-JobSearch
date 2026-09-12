@@ -109,13 +109,13 @@ def main():
     args=parser.parse_args()
     try:
         while not stop.is_set():
-            Path('/tmp/jobsearch-worker-heartbeat').touch()
-            HEARTBEAT.set(time.time())
             deadline=threading.Timer(settings().worker_max_run_seconds,lambda:os._exit(1))
             deadline.daemon=True
             deadline.start()
             try:
                 worked=run_one()
+                Path('/tmp/jobsearch-worker-heartbeat').touch()
+                HEARTBEAT.set(time.time())
             except Exception as error:
                 event('worker.failed',error_class=type(error).__name__)
                 if args.once: return 1

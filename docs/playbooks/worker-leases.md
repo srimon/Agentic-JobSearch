@@ -1,6 +1,6 @@
 # Collection worker leases and separate scheduling
 
-Status: implemented in source and integration-tested; production cutover is separate. This milestone does not deploy Kubernetes or enable external applications/email workers.
+Status: deployed to the isolated Jobsearch stack on 2026-09-12 UTC with one worker and one scheduler. This milestone does not deploy Kubernetes or enable external applications/email workers.
 
 ## Execution model
 
@@ -24,7 +24,7 @@ This is at-least-once collection with fenced/idempotent database writes, not exa
 
 SIGTERM stops further claims and allows the active run to finish. At the drain deadline the process exits 143, leaving its claim recoverable after expiration; the overlay grants 75 seconds before Docker force-kill. Graceful completion is preferred, but unbounded requests cannot hold shutdown indefinitely. Exit-code validation alone does not prove a run completed; inspect its durable state.
 
-The worker progress file advances between tasks. A task longer than ten minutes can still trigger the existing health warning despite valid lease renewal; the 15-minute run deadline remains the hard bound. Scheduler progress has its own heartbeat file. API metrics now distinguish ready queue depth, running count and oldest queued age, alongside existing aggregate queue depth. These are measurements, not an installed autoscaler; backlog may include provider-limited tasks.
+The worker progress file advances only after a successful queue pass, including a successful idle check. The health threshold allows the configured run budget plus 120 seconds; the default 15-minute run deadline remains the hard bound. The monitoring alert uses the default 1020-second threshold and must be adjusted with nondefault run budgets. Scheduler progress has its own heartbeat file. API metrics now distinguish ready queue depth, running count and oldest queued age, alongside existing aggregate queue depth. These are measurements, not an installed autoscaler; backlog may include provider-limited tasks.
 
 ## Tests
 
@@ -37,7 +37,7 @@ JBS/bin/python -m pytest tests/test_worker_leases.py tests/test_collection_obser
 
 The reset helper checks the connected database name before resetting its schema. It creates missing test roles; do not run it against shared databases other than the explicitly disposable test database. Tests use synthetic listings and mocked collectors, never employer forms or model APIs. Coverage includes concurrent provider execution, same-provider exclusion, lease renewal, expiration/fencing, bounded attempts, cooldowns, duplicate schedulers, process death and SIGTERM recovery, and existing private-data/archive regressions.
 
-## Controlled production cutover (not executed by this milestone)
+## Controlled production cutover procedure
 
 1. Back up the Jobsearch database. Keep the running image identifiers for rollback and verify no unrelated app changes are included.
 2. Pause external refresh triggers; stop/drain the legacy worker. Resolve any legacy `running` rows from actual execution evidence. Migration 013 refuses a database with running rows; do not indiscriminately mark them failed merely to bypass the guard.
@@ -45,7 +45,7 @@ The reset helper checks the connected database name before resetting its schema.
 4. Build and start the API, worker and scheduler using both `compose.yaml` and `compose.worker-leases.yaml`. The base Compose file alone does not install the new scheduler. Do not mix legacy and leased workers or rebuild the worker with new source before migration and scheduler deployment.
 5. Verify one scheduler, one worker, new queue metrics, a bounded collection and no repeated source tasks. Resume external refresh triggers. Only then consider additional workers with capacity and provider limits.
 
-Current `scripts/stack.sh` uses base Compose and expects one container per service. It has not been adapted for the opt-in overlay or replicas. Before production cutover, update lifecycle/systemd integration to include the overlay and validate replica-aware service health; the overlay is currently for explicit staging commands only. Add scheduler scraping/alerts to the deployed monitoring configuration at that same cutover. Do not claim existing lifecycle commands manage the new scheduler.
+`scripts/stack.sh` and the existing installed systemd unit now use the lifecycle wrapper with both Compose files. Lifecycle validation reads configured replica counts, verifies every replica, and ignores one-off containers. Production remains one worker; ad hoc `--scale` changes are not a substitute for updating the expected deployment configuration. Shutdown grants 75 seconds and validates final container states. The installed Jobsearch systemd unit already calls these wrappers and needed no change. Scheduler scraping and a scheduling-progress alert are active.
 
 Rollback requires stopping all leased workers and the scheduler, reconciling active leases, and restoring the old immutable worker image and scheduling owner. Added columns can remain; do not drop application data. Keep only one scheduling/execution generation active. Never roll back by starting a legacy worker alongside a leased worker.
 
@@ -54,3 +54,10 @@ Rollback requires stopping all leased workers and the scheduler, reconciling act
 110 database/collection/privacy/lifecycle regression tests passed, followed by two added targeted queue-metric and run-budget checks (112 distinct tests). The separate 21 learning/email unit tests also passed. The merged Compose overlay passed `config --quiet`; no services were started by that validation. Restricted worker-role execution was exercised against the disposable database. Two existing dependency deprecation warnings remain. Remote GitHub Actions results are not inferred from these local checks.
 
 Production migration 013 was not applied, and no production container was rebuilt or restarted. All 12 Jobsearch containers reported healthy at verification. The library project was not modified.
+
+
+## Production verification — 2026-09-12 UTC
+
+The built image passed 115 integration/regression tests and 21 learning/email tests in a temporary PostgreSQL environment with no external network and no production volumes. A protected database backup restored successfully in that environment, including decryption verification of 248 private records without printing their contents. Backup and rollback image metadata remain owner-only under `.secrets`, excluded from Git and Docker build context.
+
+The legacy worker was drained with no active run, migration 013 was applied atomically, and API/worker/scheduler were started from the verified image. A WISEcode verification run completed on its first lease attempt, fetching seven records and retaining one candidate; no application was submitted. All 13 services passed lifecycle health checks, and API, worker and scheduler Prometheus targets reported up. Existing library container IDs, start times, restart counts, mounts and networks matched before/after after normalizing unordered mount lists. No library files/services were modified.

@@ -2,11 +2,12 @@
 import argparse
 import signal
 import threading
+import time
 from pathlib import Path
 from ai_core.agents.supervisor import enqueue
 from src.db.store import connection
 from src.settings import settings
-from src.observability import setup, event
+from src.observability import setup, event, SCHEDULER_HEARTBEAT
 
 
 def schedule():
@@ -32,6 +33,7 @@ def main():
         try:
             schedule()
             Path('/tmp/jobsearch-scheduler-heartbeat').touch()
+            SCHEDULER_HEARTBEAT.set(time.time())
         except Exception as error:
             event('scheduler.failed',error_class=type(error).__name__)
             if args.once:

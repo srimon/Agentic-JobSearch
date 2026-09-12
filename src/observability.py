@@ -16,6 +16,7 @@ RUNS=Counter('jobsearch_collection_runs','Collection outcomes',['provider','outc
 DURATION=Histogram('jobsearch_collection_duration_seconds','Collection time',['provider'])
 DECISIONS=Counter('jobsearch_decisions','Classification decisions',['decision'])
 HEARTBEAT=Gauge('jobsearch_worker_heartbeat_seconds','Last worker progress timestamp')
+SCHEDULER_HEARTBEAT=Gauge('jobsearch_scheduler_heartbeat_seconds','Last successful scheduling pass')
 _initialized=False
 ALLOWED={'route','status','duration_seconds','run_id','source_id','provider','outcome','error_class','fetched','accepted','review','excluded'}
 logger=logging.getLogger('jobsearch.telemetry')
