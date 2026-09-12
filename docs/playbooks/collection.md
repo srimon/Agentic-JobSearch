@@ -1,6 +1,6 @@
 # Collection operations
 
-The standalone scheduler queues each enabled source once daily at 5:00 AM America/Los_Angeles time. It honors Pacific daylight-saving transitions and enforces at least 24 hours between runs of a source. If the service is down at 5:00 AM, the first eligible pass after startup catches up; it never starts a new day's collection before 5:00 AM. The worker executes the deterministic collection tasks. Both use dedicated database logins with no access to users, password hashes, or sessions, share only Jobsearch networks, and expose no host port.
+The standalone scheduler queues each enabled source once daily at 8:00 AM America/Los_Angeles time. It honors Pacific daylight-saving transitions and enforces at least 24 hours between runs of a source. If the service is down at 8:00 AM, the first eligible pass after startup catches up; it never starts a new day's collection before 8:00 AM. The worker executes the deterministic collection tasks. Both use dedicated database logins with no access to users, password hashes, or sessions, share only Jobsearch networks, and expose no host port.
 
 Initial boards: Headway, Homebase, Qualified Health, 9amHealth (Ashby public posting feeds). These are a small pilot, not comprehensive internet coverage. Source registration supports Ashby, Greenhouse and Lever. Operators can queue a refresh from Sources; Activity shows completed/failed runs and candidate counts. The Refresh button on Opportunities reloads stored results; it does not crawl the internet.
 

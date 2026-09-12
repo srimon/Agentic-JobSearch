@@ -173,22 +173,23 @@ def test_disabled_source_not_collected(monkeypatch):
 def test_concurrent_schedulers_create_one_run_per_source():
     sid,jid=source()
     with connection() as c:c.execute('DELETE FROM jobsearch.runs')
-    with ThreadPoolExecutor(4) as pool:results=list(pool.map(lambda _:scheduler.schedule(),range(4)))
+    after_boundary=datetime(2026,1,15,16,0,tzinfo=timezone.utc)
+    with ThreadPoolExecutor(4) as pool:results=list(pool.map(lambda _:scheduler.schedule(after_boundary),range(4)))
     assert sum(results)==1
     with connection() as c:assert c.execute('SELECT count(*) n FROM jobsearch.runs').fetchone()['n']==1
 
 
-def test_daily_scheduler_waits_until_five_am_pacific(monkeypatch):
+def test_daily_scheduler_waits_until_eight_am_pacific(monkeypatch):
     monkeypatch.setattr(scheduler,'connection',lambda:pytest.fail('Database checked before daily boundary'))
-    # 12:59 UTC is 04:59 PST in January.
-    assert scheduler.schedule(datetime(2026,1,15,12,59,tzinfo=timezone.utc))==0
+    # 15:59 UTC is 07:59 PST in January.
+    assert scheduler.schedule(datetime(2026,1,15,15,59,tzinfo=timezone.utc))==0
 
 
 def test_daily_scheduler_boundary_and_next_run():
     # Pacific standard time is UTC-8 in January; daylight time is UTC-7 in July.
-    assert scheduler.due_boundary(datetime(2026,1,15,13,0,tzinfo=timezone.utc))==datetime(2026,1,15,13,0,tzinfo=timezone.utc)
-    assert scheduler.due_boundary(datetime(2026,7,15,12,0,tzinfo=timezone.utc))==datetime(2026,7,15,12,0,tzinfo=timezone.utc)
-    assert scheduler.next_run_at(datetime(2026,7,15,11,0,tzinfo=timezone.utc))==datetime(2026,7,15,12,0,tzinfo=timezone.utc)
+    assert scheduler.due_boundary(datetime(2026,1,15,16,0,tzinfo=timezone.utc))==datetime(2026,1,15,16,0,tzinfo=timezone.utc)
+    assert scheduler.due_boundary(datetime(2026,7,15,15,0,tzinfo=timezone.utc))==datetime(2026,7,15,15,0,tzinfo=timezone.utc)
+    assert scheduler.next_run_at(datetime(2026,7,15,14,0,tzinfo=timezone.utc))==datetime(2026,7,15,15,0,tzinfo=timezone.utc)
 
 
 def test_worker_does_not_schedule(monkeypatch):
