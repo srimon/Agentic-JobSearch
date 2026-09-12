@@ -276,12 +276,14 @@ async def observe(request, call_next):
 
 @app.get('/api/collection-status')
 def collection_status(user=Depends(current_user)):
+    from ai_core.agents.scheduler import next_run_at
     with connection() as c:
         sources=c.execute("""SELECT s.company,s.enabled,s.last_success_at,s.last_error,r.status,r.fetched,r.decision_counts,r.trace_id,
-         r.created_at+(%s * interval '1 hour') AS next_scheduled_at
-         FROM jobsearch.sources s LEFT JOIN LATERAL(SELECT * FROM jobsearch.runs WHERE source_id=s.id ORDER BY created_at DESC LIMIT 1) r ON true ORDER BY s.company""",(cfg.schedule_hours,)).fetchall()
+         %s::timestamptz AS next_scheduled_at
+         FROM jobsearch.sources s LEFT JOIN LATERAL(SELECT * FROM jobsearch.runs WHERE source_id=s.id ORDER BY created_at DESC LIMIT 1) r ON true ORDER BY s.company""",(next_run_at(),)).fetchall()
         matches=c.execute("SELECT count(*) n FROM jobsearch.jobs WHERE availability='observed_open' AND match_status='match'").fetchone()['n']
-    return {'sources':sources,'current_matches':matches,'schedule_hours':cfg.schedule_hours}
+    return {'sources':sources,'current_matches':matches,'schedule_hours':cfg.schedule_hours,
+            'schedule_hour':cfg.schedule_hour,'schedule_timezone':cfg.schedule_timezone}
 
 from src.api.intake import create_router
 app.include_router(create_router(current_user))

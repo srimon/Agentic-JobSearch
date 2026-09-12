@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     origin: str = 'http://localhost:3105'
     secure_cookies: bool = False
     session_hours: int = 8
-    schedule_hours: int = 6
+    schedule_hours: int = 24
+    schedule_hour: int = Field(default=5, ge=0, le=23)
+    schedule_timezone: str = 'America/Los_Angeles'
     worker_lease_seconds: int = Field(default=120, ge=10, le=600)
     worker_heartbeat_seconds: int = Field(default=20, ge=1)
     worker_max_run_seconds: int = Field(default=900, ge=30, le=7200)
