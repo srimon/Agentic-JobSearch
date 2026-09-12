@@ -57,6 +57,8 @@ Git excludes `.secrets`, environment files (except the example), resumes, runtim
 
 ## Design and operating guides
 
+- [Enterprise AI Hub inventory and Kubernetes migration plan](docs/kubernetes-migration-plan.md)
+
 - [Architecture](docs/architecture.md) and [AI context](ai.md)
 - [Feedback learning](docs/playbooks/feedback-learning.md)
 - [Collection](docs/playbooks/collection.md) and [source integrations](docs/playbooks/job-board-integrations.md)
