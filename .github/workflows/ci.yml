@@ -26,3 +26,30 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  worker-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: jobsearch_owner
+          POSTGRES_PASSWORD: ephemeral_ci_only
+          POSTGRES_DB: jobsearch_auth_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U jobsearch_owner -d jobsearch_auth_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      JOBSEARCH_AUTH_TEST: '1'
+      JOBSEARCH_TELEMETRY: 'false'
+      # Disposable CI-only service credential; never a deployment credential.
+      JOBSEARCH_DATABASE_URL: postgresql://jobsearch_owner:ephemeral_ci_only@127.0.0.1:5432/jobsearch_auth_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r requirements.txt
+      - run: python scripts/test_database.py
+      - run: python -m pytest tests/test_worker_leases.py tests/test_collection_observability.py tests/test_intake.py tests/test_local_auth.py tests/test_collection.py tests/test_dice.py tests/test_public_feeds.py tests/test_observability.py tests/test_lifecycle.py -q

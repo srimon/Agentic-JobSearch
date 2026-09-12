@@ -18,6 +18,8 @@ A private React/Next.js application for discovering US data and AI leadership op
 
 The local collector schedules source refreshes. A separately configured Codex automation performs discovery, local preparation and email reporting every three hours. That desktop automation is not installed merely by cloning this repository. Scheduled runs do not submit applications or upload resumes to employers. Learning changes ranking only, never eligibility, privacy, archive locks or application authority. The full secured multiagent/A2A architecture described in design documents is not yet implemented.
 
+> Collector deployment update: source now includes a separate scheduler and leased workers. Read [the staging and cutover guide](docs/playbooks/worker-leases.md) before rebuilding the worker; base Compose alone is not the new deployment.
+
 ## Local deployment
 
 Requires WSL/Linux, Docker Compose, Python 3.12 and Node.js 22 for frontend development. Use a project-local Python environment named `JBS`:

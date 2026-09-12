@@ -34,11 +34,12 @@ class DatabaseMetrics:
             with connection() as c:
                 rows=c.execute("SELECT id,extract(epoch from last_success_at) AS last_success FROM jobsearch.sources WHERE enabled").fetchall()
                 queued=c.execute("SELECT count(*) n FROM jobsearch.runs WHERE status IN ('queued','running')").fetchone()['n']
+                queue=c.execute("SELECT count(*) FILTER (WHERE status='queued') ready, count(*) FILTER (WHERE status='running') running, coalesce(extract(epoch FROM now()-min(created_at) FILTER (WHERE status='queued')),0) oldest FROM jobsearch.runs").fetchone()
                 matches=c.execute("SELECT count(*) n FROM jobsearch.jobs WHERE match_status='match' AND availability='observed_open'").fetchone()['n']
             fresh=GaugeMetricFamily('jobsearch_source_last_success_seconds','Latest successful collection',labels=['source_id'])
             for row in rows: fresh.add_metric([str(row['id'])],float(row['last_success'] or 0))
             yield fresh
-            for name,value in [('jobsearch_queue_depth',queued),('jobsearch_current_matches',matches),('jobsearch_enabled_sources',len(rows))]:
+            for name,value in [('jobsearch_queue_depth',queued),('jobsearch_current_matches',matches),('jobsearch_enabled_sources',len(rows)),('jobsearch_queue_ready',queue['ready']),('jobsearch_queue_running',queue['running']),('jobsearch_queue_oldest_seconds',float(queue['oldest']))]:
                 metric=GaugeMetricFamily(name,name); metric.add_metric([],value); yield metric
             ok.add_metric([],1)
         except Exception:

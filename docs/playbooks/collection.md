@@ -17,3 +17,7 @@ Verification: collection unit tests cover role scope, both expanded CDO meanings
 Include Director, Senior Director, VP and SVP titles with explicit data, analytics, business intelligence, information management/governance, AI, artificial intelligence, machine learning or generative AI functions. Also include CTO, CIO, Chief Data Officer, Chief Digital Officer and Chief AI Officer (including CAIO). Bare CDO remains in review until its meaning is established. Generic engineering/technology leadership alone does not qualify.
 
 Specialized scientific discovery/design titles (such as AIRx Director, Computational & AI Biologics Design Lead) are excluded unless they explicitly identify a data function or an approved chief officer role. A pharmaceutical employer alone is not an exclusion. Ambiguous supporting, field, sales or marketing titles go to review. These deterministic title rules are a conservative approximation, not a verified assessment of full responsibilities. US eligibility and content guardrails still apply.
+
+## Worker scaling source update
+
+Leased worker and standalone scheduler implementation is available for staging; the production collector has not been cut over. Read [worker leases](worker-leases.md) before rebuilding or deploying the collector. Migration 013, the opt-in Compose overlay, lifecycle integration and a controlled drain are required. The earlier combined-worker description above describes the existing deployment.
