@@ -48,3 +48,5 @@ typing_extensions==4.16.0
 urllib3==2.7.0
 uvicorn==0.52.4
 pypdf==6.18.1
+
+graphql-core==3.2.6

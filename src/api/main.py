@@ -57,7 +57,7 @@ async def boundaries(request,call_next):
     response.headers['Cache-Control']='no-store'
     response.headers['X-Content-Type-Options']='nosniff'
     response.headers['Referrer-Policy']='no-referrer'
-    response.headers['X-Frame-Options']='DENY'
+    response.headers['X-Frame-Options']='SAMEORIGIN' if request.url.path.startswith('/api/monitoring/') else 'DENY'
     return response
 
 
@@ -260,7 +260,9 @@ def audit_events(user=Depends(operator)):
 
 @app.middleware('http')
 async def observe(request, call_next):
-    if request.url.path in ('/api/health','/api/session'): return await call_next(request)
+    # Do not turn every monitoring asset/query into a new Phoenix trace.
+    if request.url.path in ('/api/health','/api/session') or request.url.path.startswith(('/api/monitoring/', '/api/monitoring-status/', '/api/observability/')):
+        return await call_next(request)
     started=time.monotonic()
     with trace.get_tracer('jobsearch').start_as_current_span('http.request',record_exception=False,set_status_on_exception=False) as span:
         response=await call_next(request)
@@ -303,3 +305,6 @@ def update_learning(body:LearningChange,user=Depends(current_user)):
 
 from src.api.observability import create_router as observability_router
 app.include_router(observability_router(operator))
+
+from src.api.monitoring_ui import create_router as monitoring_ui_router
+app.include_router(monitoring_ui_router(operator))

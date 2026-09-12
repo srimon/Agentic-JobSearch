@@ -25,3 +25,10 @@ groups:
         for: 2m
         labels: {severity: critical}
         annotations: {summary: "Scheduler has stopped completing scheduling passes"}
+
+  - name: jobsearch-recording
+    rules:
+      - record: jobsearch:api_requests:rate5m
+        expr: sum by(route) (rate(jobsearch_http_requests_total[5m]))
+      - record: jobsearch:api_latency_seconds:p95_1h
+        expr: histogram_quantile(0.95, sum by(le) (rate(jobsearch_http_duration_seconds_bucket[1h])))

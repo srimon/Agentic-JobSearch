@@ -54,6 +54,7 @@ services:
     environment:
       PHOENIX_ALLOW_EXTERNAL_RESOURCES: 'false'
       PHOENIX_WORKING_DIR: /tmp/phoenix
+      PHOENIX_HOST_ROOT_PATH: /api/monitoring/phoenix
     logging:
       driver: json-file
       options: {max-size: '10m', max-file: '3'}
@@ -66,3 +67,17 @@ services:
       timeout: 5s
       retries: 12
       start_period: 60s
+
+  grafana:
+    environment:
+      GF_SERVER_ROOT_URL: http://localhost:3105/api/monitoring/grafana/
+      GF_SERVER_SERVE_FROM_SUB_PATH: 'false'
+      GF_SECURITY_ALLOW_EMBEDDING: 'true'
+  prometheus:
+    command:
+      - --config.file=/etc/prometheus/prometheus.yaml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=7d
+      - --storage.tsdb.retention.size=1GB
+      - --web.external-url=http://localhost:3105/api/monitoring/prometheus/
+      - --web.route-prefix=/

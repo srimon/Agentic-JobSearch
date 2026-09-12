@@ -1,0 +1,241 @@
+{
+  "uid": "jobsearch-logs",
+  "title": "Jobsearch \u00b7 Logs",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "15s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "tags": [
+    "jobsearch"
+  ],
+  "panels": [
+    {
+      "title": "Event volume by service",
+      "type": "timeseries",
+      "datasource": {
+        "type": "loki",
+        "uid": "jobsearch-loki"
+      },
+      "description": "Allowlisted structured telemetry fields only. No raw container, request or resume logs.",
+      "targets": [
+        {
+          "expr": "sum by(service)(count_over_time({job=\"jobsearch\"} | json [5m]))",
+          "refId": "A",
+          "legendFormat": "{{service}}",
+          "range": true,
+          "instant": false,
+          "queryType": "range"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Errors and failed runs",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "jobsearch-loki"
+      },
+      "description": "Allowlisted structured telemetry fields only. No raw container, request or resume logs.",
+      "targets": [
+        {
+          "expr": "{job=\"jobsearch\"} | json | event =~ \".*(failed|lost).*\"",
+          "refId": "A",
+          "legendFormat": "{{service}}",
+          "range": true,
+          "instant": false,
+          "queryType": "range"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Collector events",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "jobsearch-loki"
+      },
+      "description": "Allowlisted structured telemetry fields only. No raw container, request or resume logs.",
+      "targets": [
+        {
+          "expr": "{job=\"jobsearch\"} | json | service=\"jobsearch-worker\"",
+          "refId": "A",
+          "legendFormat": "{{service}}",
+          "range": true,
+          "instant": false,
+          "queryType": "range"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      },
+      "id": 3,
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "API events",
+      "type": "logs",
+      "datasource": {
+        "type": "loki",
+        "uid": "jobsearch-loki"
+      },
+      "description": "Allowlisted structured telemetry fields only. No raw container, request or resume logs.",
+      "targets": [
+        {
+          "expr": "{job=\"jobsearch\"} | json | service=\"jobsearch-api\"",
+          "refId": "A",
+          "legendFormat": "{{service}}",
+          "range": true,
+          "instant": false,
+          "queryType": "range"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    }
+  ],
+  "links": [
+    {
+      "title": "Other Jobsearch dashboards",
+      "type": "dashboards",
+      "tags": [
+        "jobsearch"
+      ],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ]
+}

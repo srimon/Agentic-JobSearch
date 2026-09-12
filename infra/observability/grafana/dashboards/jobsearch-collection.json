@@ -1,0 +1,341 @@
+{
+  "uid": "jobsearch-collection",
+  "title": "Jobsearch \u00b7 Collection & Decisions",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "refresh": "15s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "tags": [
+    "jobsearch"
+  ],
+  "panels": [
+    {
+      "title": "Collections by outcome \u00b7 rolling hour",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "jobsearch-prometheus"
+      },
+      "description": "",
+      "targets": [
+        {
+          "expr": "sum by(provider,outcome)(increase(jobsearch_collection_runs_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{provider}} {{outcome}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Collection duration p95 \u00b7 rolling hour",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "jobsearch-prometheus"
+      },
+      "description": "",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95,sum by(provider,le)(rate(jobsearch_collection_duration_seconds_bucket[1h])))",
+          "refId": "A",
+          "legendFormat": "{{provider}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Accepted matches \u00b7 rolling hour",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "jobsearch-prometheus"
+      },
+      "description": "",
+      "targets": [
+        {
+          "expr": "sum(increase(jobsearch_decisions_total{decision=\"match\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "Matches",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      },
+      "id": 3,
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Classification decisions \u00b7 rolling hour",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "jobsearch-prometheus"
+      },
+      "description": "",
+      "targets": [
+        {
+          "expr": "sum by(decision)(increase(jobsearch_decisions_total[1h]))",
+          "refId": "A",
+          "legendFormat": "{{decision}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Guardrail decisions \u00b7 rolling hour",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "jobsearch-prometheus"
+      },
+      "description": "Actual classifier content guardrails; no model quality score is inferred.",
+      "targets": [
+        {
+          "expr": "sum by(decision)(increase(jobsearch_decisions_total{decision=~\"sensitive_content|guardrail_review\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "{{decision}}",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "title": "Duplicates observed \u00b7 rolling hour",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "jobsearch-prometheus"
+      },
+      "description": "",
+      "targets": [
+        {
+          "expr": "sum(increase(jobsearch_decisions_total{decision=\"duplicate\"}[1h]))",
+          "refId": "A",
+          "legendFormat": "Duplicates",
+          "range": true,
+          "instant": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 12,
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        },
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        }
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      }
+    }
+  ],
+  "links": [
+    {
+      "title": "Other Jobsearch dashboards",
+      "type": "dashboards",
+      "tags": [
+        "jobsearch"
+      ],
+      "asDropdown": true,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ]
+}
