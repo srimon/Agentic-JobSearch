@@ -26,3 +26,9 @@ Active coverage now includes ten employer boards across Ashby, Greenhouse and Le
 
 ## Scheduled source verification — 2026-09-11
 OpenAI public Ashby board `openai` was verified against the official OpenAI careers page and Ashby public job-posting API documentation. The network-enabled collector probe returned 789 postings; the durable collection retained one review candidate and no matching US leadership roles. Enabled through the existing source registry. Engine was already registered and was not duplicated. Public probes belong in the worker network, not the API container. References: https://openai.com/careers/search/ and https://developers.ashbyhq.com/docs/public-job-posting-api .
+
+## Scheduled source verification — 2026-09-12 UTC
+
+Databricks board `databricks` was tested through the existing Greenhouse collector on the worker network. The probe returned 888 normalized postings and one deterministic title/US match; this is a point-in-time probe, not a claim of full relevance or application readiness. The source was registered and queued for durable collection. No credentials, resume or intake data were sent. Greenhouse documents unauthenticated public GET endpoints; submission access is separate. The public Greenhouse board redirects to the employer's careers site, supporting board identity. Scheduled run results remain private runtime data, outside Git.
+
+References: https://docs.greenhouse.io/job-board.html , https://job-boards.greenhouse.io/databricks , https://www.databricks.com/company/careers/open-positions .
