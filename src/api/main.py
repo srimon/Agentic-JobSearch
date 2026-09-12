@@ -300,3 +300,6 @@ def update_learning(body:LearningChange,user=Depends(current_user)):
     if not set(user['roles'])&{'member','administrator'}:raise HTTPException(403,'Member role required')
     with private_connection(user['id']) as c:configure_learning(c,user['id'],body.action,body.version)
     return {'ok':True}
+
+from src.api.observability import create_router as observability_router
+app.include_router(observability_router(operator))

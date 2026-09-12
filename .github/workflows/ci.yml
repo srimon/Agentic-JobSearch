@@ -52,4 +52,4 @@ jobs:
           python-version: '3.12'
       - run: pip install -r requirements.txt
       - run: python scripts/test_database.py
-      - run: python -m pytest tests/test_worker_leases.py tests/test_collection_observability.py tests/test_intake.py tests/test_local_auth.py tests/test_collection.py tests/test_dice.py tests/test_public_feeds.py tests/test_observability.py tests/test_lifecycle.py -q
+      - run: python -m pytest tests/test_worker_leases.py tests/test_collection_observability.py tests/test_intake.py tests/test_local_auth.py tests/test_collection.py tests/test_dice.py tests/test_public_feeds.py tests/test_observability.py tests/test_lifecycle.py tests/test_observability_panel.py -q
