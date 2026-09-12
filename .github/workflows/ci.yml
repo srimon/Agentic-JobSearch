@@ -11,6 +11,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
+      - run: python -m pytest tests/test_migration_readiness.py -q
       - run: python -m unittest evaluation.test_learning evaluation.test_email_report evaluation.test_email_secret evaluation.test_scheduled_email evaluation.test_email_tracking
   frontend:
     runs-on: ubuntu-latest

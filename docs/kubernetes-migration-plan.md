@@ -1,6 +1,14 @@
 # Enterprise AI Hub: inventory and Kubernetes migration plan
 
-Date: 2026-09-11. Status: read-only discovery completed; proposed migration design, not a deployed Kubernetes platform.
+Date: 2026-09-11. Updated: 2026-09-12 UTC. Status: Jobsearch collector readiness and in-app monitoring deployed; Kubernetes platform remains proposed.
+
+## Current milestone
+
+The inventory and original blocking analysis below are historical observations. The collector scheduling/lease redesign has since been deployed with one scheduler and one worker; see `playbooks/worker-leases.md`. Jobsearch now has 14 configured services, including its own Phoenix, and operator-only Prometheus/Phoenix/Grafana panels. No Kubernetes migration or Library change has occurred. Reporting portability remains outstanding: `scripts/email_report.py` uses Docker Compose execution and a host delivery journal. Do not duplicate that sender in pods.
+
+The next milestone is an isolated local Kubernetes pilot using synthetic state and disabled external actions. Before installation, run `JBS/bin/python scripts/migration_readiness.py`. It reports Docker capacity, Jobsearch health and tools on PATH without contacting Kubernetes, reading credentials, querying application records or modifying services. Missing measurements are unknown; the report never certifies production migration readiness. Tool presence does not establish that a usable cluster exists.
+
+Remaining pilot choices: local distribution, NetworkPolicy-enforcing CNI, storage and recovery procedure, reserved ports, and representative resource budget. Production Compose continues to own all writes until staging and cutover gates pass. Keep PostgreSQL/Qdrant/Redis separate for the initial migration. The reporting rewrite can proceed independently but must pass durable ownership and uncertain SMTP-outcome tests before report scheduling moves.
 
 ## Scope and boundaries
 
@@ -122,3 +130,8 @@ This milestone delivers an inventory and design only. No Kubernetes resources, s
 - [Kubernetes multi-tenancy](https://kubernetes.io/docs/concepts/security/multi-tenancy/): namespace boundaries and policy requirements.
 - [Kubernetes NetworkPolicy](https://kubernetes.io/docs/concepts/services-networking/network-policies/): enforcement requires supporting networking.
 - [KEDA scaling Jobs](https://keda.sh/docs/2.21/concepts/scaling-jobs/): event-driven finite task execution.
+
+
+## Pilot preflight observation — 2026-09-12 UTC
+
+The read-only preflight found 14 healthy Jobsearch containers. Docker reported 16 CPUs and 33,504,272,384 bytes of memory capacity (~31.2 GiB). The WSL filesystem reported about 848 GiB available. These are not measurements of spare physical host resources. kubectl, kind, k3d, k3s and helm were absent from PATH. No cluster was installed or contacted, and no services or schedules were changed. Four isolated preflight tests passed, including unavailable inventory, health ambiguity, command scope and error redaction. This completes a repeatable local inventory check, not the capacity, staging or production migration gates.
