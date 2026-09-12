@@ -52,6 +52,38 @@ with private_connection(u['id']) as c:
 '''
 
 
+
+def report_transport():
+    value = os.environ.get('JOBSEARCH_REPORT_TRANSPORT', 'compose')
+    if value not in ('compose', 'direct'):
+        raise RuntimeError('Unsupported report transport')
+    return value
+
+def state_directory():
+    return Path(os.environ.get('JOBSEARCH_REPORT_STATE_DIR', str(ROOT / 'data' / 'processed')))
+
+def report_origin():
+    value = os.environ.get('JOBSEARCH_REPORT_ORIGIN', 'http://localhost:3105').rstrip('/')
+    parsed = urlsplit(value)
+    if (parsed.scheme not in ('https', 'http') or not parsed.hostname or parsed.username or parsed.password
+        or parsed.path or parsed.query or parsed.fragment or any(c.isspace() for c in value)
+        or (parsed.scheme == 'http' and parsed.hostname not in ('localhost', '127.0.0.1'))):
+        raise RuntimeError('Report origin must be HTTPS, or loopback HTTP')
+    return value
+
+def export_rows():
+    if report_transport() == 'direct':
+        try:
+            from src.applications.reporting import export_rows as direct_export
+            return direct_export()
+        except Exception:
+            raise RuntimeError('Could not read the owner application report; no email sent.') from None
+    result = subprocess.run(['docker','compose','-p','jobsearch','-f',str(ROOT/'compose.yaml'),'exec','-T','api','python','-c',EXPORT],capture_output=True,text=True)
+    if result.returncode:
+        raise RuntimeError('Could not read the owner application report; no email sent.')
+    return json.loads(result.stdout)
+
+
 def application_url(value):
     if not isinstance(value, str) or len(value) > 4096 or any(c.isspace() for c in value):
         return None
@@ -66,7 +98,7 @@ def application_url(value):
 def html_report(body):
     lines = []
     for line in body.splitlines():
-        if line.startswith('Manage status: http://localhost:3105/?view=emailed&job='):
+        if line.startswith('Manage status: ' + report_origin() + '/?view=emailed&job='):
             url = line.removeprefix('Manage status: ')
             try:
                 uuid.UUID(url.rsplit('=',1)[1])
@@ -105,7 +137,7 @@ def render(rows):
             lines.append('Application link: ' + url)
         if row.get('job_id'):
             job_id = str(uuid.UUID(str(row['job_id'])))
-            lines.append('Manage status: http://localhost:3105/?view=emailed&job=' + job_id)
+            lines.append('Manage status: ' + report_origin() + '/?view=emailed&job=' + job_id)
         if row.get('status') in ('submission_unknown', 'submitting'):
             lines.append('Verify the previous attempt before submitting again; duplicate retry is blocked.')
     if not rows:
@@ -161,7 +193,7 @@ def validate_password(value):
     return value
 
 def secret_directory():
-    directory = ROOT / '.secrets'
+    directory = Path(os.environ.get('JOBSEARCH_REPORT_SECRET_DIR', str(ROOT / '.secrets')))
     directory.mkdir(mode=0o700, exist_ok=True)
     info = directory.lstat()
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or stat.S_IMODE(info.st_mode) != 0o700:
@@ -200,7 +232,7 @@ def scheduled_body(body, now=None):
     now = now or datetime.now(timezone.utc)
     window = now.astimezone(timezone.utc).replace(hour=(now.astimezone(timezone.utc).hour // 3) * 3, minute=0, second=0, microsecond=0)
     lines = ['Scheduled report window: ' + window.isoformat(), '']
-    path = ROOT / 'data' / 'processed' / 'scheduled-run-summary.json'
+    path = state_directory() / 'scheduled-run-summary.json'
     if path.exists():
         if now.timestamp() - path.stat().st_mtime > 10800:
             lines.append('Run summary is stale; current collection/source-check results are not verified.')
@@ -242,6 +274,13 @@ with private_connection(u['id']) as c:
 def track_report(body, rows, accepted=False):
     data = {'report_hash':hashlib.sha256((ADDRESS+'\n'+body).encode()).hexdigest(),
             'job_ids':[str(uuid.UUID(str(row['job_id']))) for row in rows if row.get('job_id')], 'accepted':accepted}
+    if report_transport() == 'direct':
+        try:
+            from src.applications.reporting import record_report_data
+            record_report_data(data)
+            return
+        except Exception:
+            raise RuntimeError('Email history update failed. Check delivery journal before retrying; email may already have been accepted.' if accepted else 'Could not prepare email history; no email sent.') from None
     result = subprocess.run(['docker','compose','-p','jobsearch','-f',str(ROOT/'compose.yaml'),'exec','-T','api','python','-c',TRACK_REPORT],input=json.dumps(data),capture_output=True,text=True)
     if result.returncode:
         raise RuntimeError('Email history update failed. Check delivery journal before retrying; email may already have been accepted.' if accepted else 'Could not prepare email history; no email sent.')
@@ -276,10 +315,7 @@ def main():
         save_password(value)
         print('Gmail app password saved with owner-only permissions. No email sent.')
         return
-    result = subprocess.run(['docker','compose','-p','jobsearch','-f',str(ROOT/'compose.yaml'),'exec','-T','api','python','-c',EXPORT],capture_output=True,text=True)
-    if result.returncode:
-        raise RuntimeError('Could not read the owner application report; no email sent.')
-    rows = json.loads(result.stdout)
+    rows = export_rows()
     body = render(rows)
     if args.scheduled:
         body = scheduled_body(body)
@@ -292,7 +328,7 @@ def main():
             raise RuntimeError('First run ./scripts/email-report.sh configure in your WSL terminal.')
         password = validate_password(getpass.getpass('Google app password (hidden, not saved): '))
     try:
-        print(send_tracked(body,rows,password,ROOT/'data'/'processed'/'email-delivery.jsonl'))
+        print(send_tracked(body,rows,password,state_directory()/'email-delivery.jsonl'))
     finally:
         password = None
 
