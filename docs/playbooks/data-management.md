@@ -1,0 +1,5 @@
+# Data Management navigation
+
+Staging operators have a grouped Data Management menu. Analytics opens the authenticated ClickHouse console on localhost:3187/play. Quality entries select existing GX/Soda/dbt evidence; modelling keeps the SchemaSpy viewer and OpenMetadata catalog. Governance and lineage open OpenMetadata with a separate account; lineage ingestion is pending. Data Science and DAG scheduling are unconfigured placeholders. Ingestion links to existing discovery activity, not a new analytical ingestion pipeline.
+
+Existing quality/model/governance deep links remain valid. New tool links use ?view=data-<tool>. No privileges, credentials, ingestion jobs, production routes or scheduler settings change.

@@ -32,3 +32,5 @@
 .app-header .region{position:absolute;right:24px;top:50%;transform:translateY(-50%)}
 .sidebar>.workspace-label{margin-top:12px}
 @media(max-width:700px){.app-header{padding:20px 16px;min-height:80px}.app-title{font-size:25px}.app-header .region{display:none}.sidebar nav{margin-top:0}footer{gap:12px;flex-wrap:wrap}}
+
+.data-nav{margin-top:16px;border-top:1px solid #cbd5e155;padding-top:12px}.data-nav summary{cursor:pointer;padding:10px 4px;font-weight:600}.data-nav details{padding-left:10px;border-left:1px solid #94a3b855;margin-left:7px}.data-nav details summary{font-size:12px;opacity:.85}.sidebar .data-nav .nav-item{font-size:12px;white-space:normal;text-align:left;padding:9px 10px}.sidebar{overflow-y:auto}
