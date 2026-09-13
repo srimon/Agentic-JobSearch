@@ -2,6 +2,8 @@ import type {NextConfig} from 'next';
 const config:NextConfig={
   output:'standalone',
   poweredByHeader:false,
+  // Embedded upstream interfaces own their slash-sensitive routes and assets.
+  skipTrailingSlashRedirect:true,
   async rewrites(){return [{source:'/api/:path*',destination:'http://api:8100/api/:path*'}]},
   async headers(){return [{source:'/:path*',headers:[
     {key:'X-Content-Type-Options',value:'nosniff'},
