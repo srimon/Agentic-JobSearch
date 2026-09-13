@@ -34,3 +34,5 @@
 @media(max-width:700px){.app-header{padding:20px 16px;min-height:80px}.app-title{font-size:25px}.app-header .region{display:none}.sidebar nav{margin-top:0}footer{gap:12px;flex-wrap:wrap}}
 
 .data-nav{margin-top:16px;border-top:1px solid #cbd5e155;padding-top:12px}.data-nav summary{cursor:pointer;padding:10px 4px;font-weight:600}.data-nav details{padding-left:10px;border-left:1px solid #94a3b855;margin-left:7px}.data-nav details summary{font-size:12px;opacity:.85}.sidebar .data-nav .nav-item{font-size:12px;white-space:normal;text-align:left;padding:9px 10px}.sidebar{overflow-y:auto}
+
+.analytics-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;margin:24px 0}.analytics-chart{padding:20px;border:1px solid #94a3b844;border-radius:16px;background:#64748b0c}.analytics-bar{margin:13px 0}.analytics-bar>div:first-child{display:flex;justify-content:space-between;gap:12px;font-size:13px}.analytics-track{height:8px;border-radius:8px;background:#64748b22;margin-top:6px}.analytics-track>span{display:block;height:100%;border-radius:8px;background:linear-gradient(90deg,#6366f1,#06b6d4)}

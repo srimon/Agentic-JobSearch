@@ -316,3 +316,6 @@ app.include_router(quality_router(operator))
 
 from src.api.data_model import create_router as data_model_router
 app.include_router(data_model_router(operator))
+
+from src.api.analytics import create_router as analytics_router
+app.include_router(analytics_router(operator))

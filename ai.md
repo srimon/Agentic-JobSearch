@@ -1,3 +1,5 @@
+> Jobsearch-only staging analytics: see docs/playbooks/clickhouse-analytics.md. All new deployment work must target only Jobsearch; never use combined Hub/library rollout scripts.
+
 > Resume intake update: encrypted owner-scoped intake and application evidence checks are implemented. See docs/playbooks/resume-intake.md. External application submission is not yet implemented.
 
 > Authentication update: local administrator-created accounts replace external OIDC sign-in. See docs/decisions/0003-local-authentication.md and docs/playbooks/local-authentication.md (relative to the project root). MFA remains pending.
