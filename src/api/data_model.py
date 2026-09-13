@@ -15,7 +15,7 @@ def valid_path(path):
 def create_router(operator):
     router=APIRouter(prefix='/api/data-model')
     def staging():
-        if urlsplit(settings().database_url).path!='/jobsearch_staging':raise HTTPException(404,'Data model is available in staging only')
+        if urlsplit(settings().database_url).path!='/jobsearch_staging' and not getattr(settings(), 'data_management_enabled', False):raise HTTPException(404,'Data management is disabled')
     @router.get('')
     def metadata(user=Depends(operator)):
         staging()

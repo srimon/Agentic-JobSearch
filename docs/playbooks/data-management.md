@@ -5,3 +5,5 @@ Staging operators have a grouped Data Management menu. Analytics opens the authe
 Existing quality/model/governance deep links remain valid. New tool links use ?view=data-<tool>. No privileges, credentials, ingestion jobs, production routes or scheduler settings change.
 
 The Notifications sidebar entry opens Slack workspace Sean, channel #general, using the owner-provided channel URL. The Slack app is ENTERPRISE-AI-HUB. These names were confirmed from the owner screenshot; webhook credentials are unchanged.
+
+Production consolidation: JOBSEARCH_DATA_MANAGEMENT_ENABLED=true explicitly enables operator-only snapshot endpoints on the production database. Default remains disabled outside staging. This flag does not generate snapshots or claim quality checks ran; missing snapshots remain not_generated/empty. Snapshot schema and source-specific production pipelines must be deployed before final data-tool acceptance.
