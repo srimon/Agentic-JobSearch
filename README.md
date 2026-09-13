@@ -1,3 +1,5 @@
+> Current production (2026-09-13): Jobsearch runs in enterprise-hub/jbs-production at http://localhost:3105 with one worker and scheduler. Old Compose application containers are stopped and fenced by .compose-retired. Do not run raw Compose up or reactivate them. Use the Hub runbook under /home/srimonadi/Enterprise-AI-Hub-consolidation/docs/runbooks/enterprise-ai-hub.md. Existing account.sh and email-report.sh route to the active runtime. Daily workflow: 08:00 America/Los_Angeles. MBK migration and old-infrastructure cleanup remain separate pending work.
+
 # JBS — AI Autonomous Job Search
 
 A private React/Next.js application for discovering US data and AI leadership opportunities, reviewing resume evidence, tracking application decisions, and learning bounded ranking preferences from explicit feedback.
