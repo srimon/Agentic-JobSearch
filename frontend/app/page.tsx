@@ -57,7 +57,7 @@ export default function Home(){
 
  const user=session?.user, operator=!!user?.roles.some(r=>['operator','administrator'].includes(r)),member=!!user?.roles.some(r=>['member','administrator'].includes(r));
 
- useEffect(()=>{const params=new URLSearchParams(window.location.search);if(['matches','emailed','archive','saved','observability','quality','model','governance','runs',...dataGroups.flatMap(g=>g.tools.map(t=>'data-'+t.id))].includes(params.get('view')||'')){setTab(params.get('view')!);setDate(params.get('view')==='archive'?'any':'24h');setShowDismissed(params.get('view')==='emailed')}},[]);
+ useEffect(()=>{const params=new URLSearchParams(window.location.search);if(['matches','emailed','archive','saved','observability','quality','model','governance','runs','data-slack',...dataGroups.flatMap(g=>g.tools.map(t=>'data-'+t.id))].includes(params.get('view')||'')){setTab(params.get('view')!);setDate(params.get('view')==='archive'?'any':'24h');setShowDismissed(params.get('view')==='emailed')}},[]);
  useEffect(()=>{if(!user)return;const id=new URLSearchParams(window.location.search).get('job');if(id&&/^[0-9a-f-]{36}$/i.test(id))api<Job>('/jobs/'+id).then(j=>{if(j.archived_at)setNotice('This job is archived and locked.');else setDetail(j)}).catch(e=>setError(e.message));},[user]);
 
  useEffect(()=>{if(!user)return;const id=new URLSearchParams(window.location.search).get('archived');if(id&&/^[0-9a-f-]{36}$/i.test(id))api<Job>('/jobs/'+id).then(j=>{if(j.archived_at)setNotice('Status saved. The job is archived and permanently locked.')}).catch(e=>setError(e.message));},[user]);
@@ -106,7 +106,7 @@ export default function Home(){
   }catch(e){setError((e as Error).message)}
  }
 
- const labels:Record<string,string>={archive:'Archive',emailed:'Emailed jobs',matches:'All opportunities',saved:'Saved jobs',review:'Needs review',sources:'Source coverage',runs:'Collection runs',intake:'Resume & profile',applications:'Application checks',observability:'Observability',quality:'Data quality',model:'Data model',governance:'Data governance',...Object.fromEntries(dataGroups.flatMap(g=>g.tools.map(t=>['data-'+t.id,t.name])))};
+ const labels:Record<string,string>={archive:'Archive',emailed:'Emailed jobs',matches:'All opportunities',saved:'Saved jobs',review:'Needs review',sources:'Source coverage',runs:'Collection runs',intake:'Resume & profile',applications:'Application checks',observability:'Observability',quality:'Data quality',model:'Data model',governance:'Data governance','data-slack':'Slack notifications',...Object.fromEntries(dataGroups.flatMap(g=>g.tools.map(t=>['data-'+t.id,t.name])))};
 
  return <div className="shell"><MotionScene loading={loading} saving={!!busyJob} label={labels[tab]}/><aside className="sidebar"><div className="workspace-label">YOUR WORKSPACE</div><nav aria-label="Main navigation">
 
