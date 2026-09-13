@@ -38,3 +38,6 @@ id_rsa*
 .DS_Store
 
 .runtime/
+
+# Local production handoff fence
+.compose-retired

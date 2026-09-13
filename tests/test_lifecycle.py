@@ -1,6 +1,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import tempfile
 from unittest.mock import patch
 
 path=Path(__file__).resolve().parents[1]/'scripts/lifecycle.py'
@@ -53,9 +54,19 @@ class LifecycleTests(unittest.TestCase):
     @patch.object(module,'inspect_project',return_value=[])
     @patch.object(module,'command',side_effect=module.LifecycleError('command_timeout'))
     def test_timeout_records_failure(self,command,inspect,event,save):
-        self.assertEqual(module.execute('start'),1)
+        with tempfile.TemporaryDirectory() as directory, patch.object(module,'ROOT',Path(directory)):
+            self.assertEqual(module.execute('start'),1)
         self.assertFalse(save.call_args.args[0]['verified'])
         self.assertEqual(save.call_args.args[0]['error'],'command_timeout')
 
 
 if __name__=='__main__': unittest.main()
+
+class RetirementFenceTests(unittest.TestCase):
+    @patch.object(module,'command')
+    @patch.object(module,'event')
+    def test_retired_start_never_invokes_compose(self,event,command):
+        with tempfile.TemporaryDirectory() as directory, patch.object(module,'ROOT',Path(directory)):
+            (Path(directory)/'.compose-retired').touch()
+            self.assertEqual(module.execute('start'),0)
+            command.assert_not_called()
