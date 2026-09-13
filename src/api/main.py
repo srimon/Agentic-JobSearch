@@ -310,3 +310,6 @@ app.include_router(observability_router(operator))
 
 from src.api.monitoring_ui import create_router as monitoring_ui_router
 app.include_router(monitoring_ui_router(operator))
+
+from src.api.data_quality import create_router as quality_router
+app.include_router(quality_router(operator))
