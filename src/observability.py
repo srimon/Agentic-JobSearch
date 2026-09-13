@@ -37,9 +37,19 @@ class DatabaseMetrics:
                 queued=c.execute("SELECT count(*) n FROM jobsearch.runs WHERE status IN ('queued','running')").fetchone()['n']
                 queue=c.execute("SELECT count(*) FILTER (WHERE status='queued') ready, count(*) FILTER (WHERE status='running') running, coalesce(extract(epoch FROM now()-min(created_at) FILTER (WHERE status='queued')),0) oldest FROM jobsearch.runs").fetchone()
                 matches=c.execute("SELECT count(*) n FROM jobsearch.jobs WHERE match_status='match' AND availability='observed_open'").fetchone()['n']
+                run_counts=c.execute('SELECT status,count(*) n FROM jobsearch.runs GROUP BY status').fetchall()
+                candidate_counts=c.execute("SELECT match_status,count(*) n FROM jobsearch.jobs WHERE availability='observed_open' GROUP BY match_status").fetchall()
             fresh=GaugeMetricFamily('jobsearch_source_last_success_seconds','Latest successful collection',labels=['source_id'])
             for row in rows: fresh.add_metric([str(row['id'])],float(row['last_success'] or 0))
             yield fresh
+            history=GaugeMetricFamily('jobsearch_discovery_runs','Persisted discovery runs by status',labels=['status'])
+            counts={r['status']:r['n'] for r in run_counts}
+            for status in ('queued','running','completed','failed'): history.add_metric([status],counts.get(status,0))
+            yield history
+            candidates=GaugeMetricFamily('jobsearch_discovery_candidates','Currently observed listings by classification',labels=['status'])
+            counts={r['match_status']:r['n'] for r in candidate_counts}
+            for status in ('match','review'): candidates.add_metric([status],counts.get(status,0))
+            yield candidates
             for name,value in [('jobsearch_queue_depth',queued),('jobsearch_current_matches',matches),('jobsearch_enabled_sources',len(rows)),('jobsearch_queue_ready',queue['ready']),('jobsearch_queue_running',queue['running']),('jobsearch_queue_oldest_seconds',float(queue['oldest']))]:
                 metric=GaugeMetricFamily(name,name); metric.add_metric([],value); yield metric
             ok.add_metric([],1)
