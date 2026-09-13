@@ -1,3 +1,5 @@
+> Production cutover is reauthorized for Jobsearch only, but has not occurred. Live target-readiness findings and required gates are in docs/playbooks/production-cutover.md.
+
 > Jobsearch-only staging analytics: see docs/playbooks/clickhouse-analytics.md. All new deployment work must target only Jobsearch; never use combined Hub/library rollout scripts.
 
 > Resume intake update: encrypted owner-scoped intake and application evidence checks are implemented. See docs/playbooks/resume-intake.md. External application submission is not yet implemented.
