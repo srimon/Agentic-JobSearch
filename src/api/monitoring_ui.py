@@ -152,8 +152,9 @@ def create_router(operator):
             return {'available': result.status_code == 200}
         except HTTPException:
             return {'available': False}
+    @router.api_route(PREFIX + '{tool}', methods=['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'], dependencies=[Depends(operator)])
     @router.api_route(PREFIX + '{tool}/{path:path}', methods=['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE'], dependencies=[Depends(operator)])
-    async def display(tool: str, path: str, request: Request):
+    async def display(tool: str, request: Request, path: str = ''):
         body = await request.body()
         validate(tool, path, request.method, body)
         if tool == 'phoenix' and path.rstrip('/') == 'graphql' and request.method == 'GET' and request.query_params.get('query'):
