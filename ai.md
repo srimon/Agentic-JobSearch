@@ -1,3 +1,5 @@
+> 2026-09-13: The owner authorized full shared infrastructure consolidation and production cutover. Application code stays here; enterprise-hub is the new shared target. Follow the gated plan in /home/srimonadi/Enterprise-AI-Hub-consolidation/docs/plans/consolidation-execution.md. Earlier dedicated-service rules apply to the old deployment until its validated cutover.
+
 > Kubernetes migration progress: Jobsearch production namespace isolation baseline exists with no workloads. Fresh local Jobsearch/Phoenix restore passed. Shared node advertises 4 GiB despite its 12 GiB cgroup limit; platform-owner correction is required before production acceptance. No traffic or writer cutover yet. See docs/playbooks/production-cutover.md.
 
 > Production cutover is reauthorized for Jobsearch only, but has not occurred. Live target-readiness findings and required gates are in docs/playbooks/production-cutover.md.

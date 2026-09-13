@@ -62,13 +62,16 @@ def setup(service):
     if _initialized or os.getenv('JOBSEARCH_TELEMETRY')!='true': return
     _initialized=True
     os.environ['OTEL_SERVICE_NAME']=service
-    provider=TracerProvider(resource=Resource.create({'service.name':service,'deployment.environment.name':'local'}))
-    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint='http://otel:4318/v1/traces',timeout=3)))
+    resource=Resource.create({'service.name':service,'deployment.environment.name':os.getenv('JOBSEARCH_ENVIRONMENT','local')})
+    provider=TracerProvider(resource=resource)
+    provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter(endpoint=os.getenv('OTEL_EXPORTER_OTLP_TRACES_ENDPOINT','http://otel:4318/v1/traces'),timeout=3)))
     trace.set_tracer_provider(provider)
     folder=Path('/app/telemetry'); folder.mkdir(exist_ok=True)
     handler=RotatingFileHandler(folder/(service+'.jsonl'),maxBytes=5*1024*1024,backupCount=3)
     handler.setFormatter(logging.Formatter('%(message)s'))
     logger.setLevel(logging.INFO); logger.addHandler(handler); logger.addHandler(logging.StreamHandler()); logger.propagate=False
+    if os.getenv('JOBSEARCH_OTLP_LOGS')=='true':
+        setup_log_export(resource)
     if service=='jobsearch-api': REGISTRY.register(DatabaseMetrics())
     start_http_server(9108)
     event('service.started')
@@ -81,3 +84,17 @@ def collection_span(run):
         event('collection.started',run_id=str(run['id']),source_id=run['source_id'],provider=run['provider'])
         try: yield span
         finally: DURATION.labels(run['provider']).observe(time.monotonic()-started)
+
+
+def setup_log_export(resource):
+    """Export only the dedicated allowlisted event logger, never root logs."""
+    from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
+    from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
+    from opentelemetry.exporter.otlp.proto.http._log_exporter import OTLPLogExporter
+    provider=LoggerProvider(resource=resource)
+    provider.add_log_record_processor(BatchLogRecordProcessor(OTLPLogExporter(
+        endpoint=os.getenv('OTEL_EXPORTER_OTLP_LOGS_ENDPOINT','http://otel:4318/v1/logs'),timeout=3),
+        max_queue_size=512,max_export_batch_size=64))
+    handler=LoggingHandler(level=logging.INFO,logger_provider=provider)
+    logger.addHandler(handler)
+    return provider,handler

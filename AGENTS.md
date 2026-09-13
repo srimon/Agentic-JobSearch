@@ -1,3 +1,5 @@
+> 2026-09-13: The owner authorized full shared infrastructure consolidation and production cutover. Application code stays here; enterprise-hub is the new shared target. Follow the gated plan in /home/srimonadi/Enterprise-AI-Hub-consolidation/docs/plans/consolidation-execution.md. Earlier dedicated-service rules apply to the old deployment until its validated cutover.
+
 # Working instructions for Jobsearch
 
 - Project root: `/home/srimonadi/Jobsearch`.
