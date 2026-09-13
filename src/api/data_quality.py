@@ -17,7 +17,7 @@ def create_router(operator):
                 runs = []
             else:
                 runs = conn.execute("SELECT id, started_at, finished_at, status, report FROM jobsearch.quality_runs ORDER BY started_at DESC LIMIT 30").fetchall()
-        return {'workload': 'Jobsearch staging', 'engine': 'Great Expectations',
-                'adapters': {'gx': 'enabled', 'soda': 'not_installed', 'slack': 'disabled'},
+        return {'workload': 'Jobsearch staging', 'engine': 'GX / Soda / dbt',
+                'adapters': {**{engine: ('verified' if any(r['status']=='completed' and r['report'].get('engine','gx')==engine for r in runs) else 'not_verified') for engine in ('gx','soda','dbt')}, 'slack':'disabled'},
                 'execution': 'After public-feed refresh or operator CLI', 'runs': runs}
     return router
