@@ -27,7 +27,7 @@ type Source={id:number;company:string;provider:string;board:string;enabled:boole
 
 type Run={id:string;company:string;status:string;created_at:string;fetched:number;matched:number;error:string|null};
 
-type Session={user:User|null;identity_ready:boolean;features?:{data_management?:boolean}};
+type Session={user:User|null;identity_ready:boolean;features?:{data_management?:boolean;maintenance?:boolean}};
 
 const dismissalLabels:Record<string,string>={spam:'Spam',fake_posting:'Suspected fake posting',not_relevant:'Not relevant',dismissed:'Dismissed',old_posting:'Old posting',already_applied_elsewhere:'Already applied elsewhere',not_interested:'Not interested',no_longer_available:'No longer available'};
 const applied=(job:Job)=>job.application_status==='submitted'||['applied','interviewing','offer','closed'].includes(job.stage||'');
@@ -118,6 +118,7 @@ export default function Home(){
  <div className="identity"><ShieldCheck size={18}/><div><strong>{user?.name||'Private workspace'}</strong><small>Private account</small></div>{user&&<button className="icon-button" title="Sign out" onClick={async()=>{await api('/auth/logout',{method:'POST'});location.reload()}}><LogOut size={16}/></button>}</div></aside>
 
  <main><header className="topbar app-header"><h2 className="app-title">AI Autonomous Job Search</h2><span className="region">US market</span></header>
+ {session?.features?.maintenance&&<p className="notice" role="status">Maintenance validation · Changes to jobs, profiles and applications are temporarily disabled.</p>}
  {process.env.NEXT_PUBLIC_JOBSEARCH_ENVIRONMENT==='staging'&&<p className="notice" role="status">Staging · Separate public job feed. No automatic applications or email. The default view shows jobs posted in the past 24 hours; choose Any time to inspect older verified listings.</p>}
 
  <section className="content"><div key={tab} className="page-heading page-arrival"><div><div className="eyebrow">YOUR NEXT CHAPTER</div><h1>{labels[tab]}</h1><p>{tab==='emailed'?'Work through the jobs in your email reports. Selecting a status saves it immediately, permanently locks the job and moves it to Archive.':tab==='archive'?'Completed decisions are locked. Archived jobs are excluded from future reports.':tab==='sources'?'See where your opportunities come from.':tab==='runs'?'Track source checks and collection outcomes.':tab==='model'?'Explore the PostgreSQL table structure and declared relationships.':tab==='quality'?'Evidence-based checks for this application.':tab==='observability'?'Live metrics and traces, together in your workspace.':'Find the role where your experience makes a difference.'}</p></div><button className="secondary" disabled={!user||loading} onClick={()=>setVersion(v=>v+1)}><RefreshCw size={16} className={loading?'spin':''}/>Refresh</button></div>

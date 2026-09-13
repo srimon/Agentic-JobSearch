@@ -34,6 +34,8 @@ async def invalid_request(request, exc):
 
 @app.middleware('http')
 async def boundaries(request,call_next):
+    if cfg.maintenance_mode and request.method not in ('GET','HEAD','OPTIONS') and request.url.path not in ('/api/auth/login','/api/auth/logout') and not request.url.path.startswith('/api/monitoring/'):
+        return JSONResponse({'detail':'Maintenance mode: changes are temporarily disabled.'},status_code=503,headers={'Retry-After':'300','Cache-Control':'no-store'})
     if request.method in ('POST','PUT','PATCH','DELETE'):
         if request.headers.get('origin')!=cfg.origin:
             return JSONResponse({'detail':'Origin rejected'},status_code=403)
@@ -89,7 +91,7 @@ def session(request:Request):
     try: user=current_user(request)
     except HTTPException: user=None
     return {'user': {'name':user['display_name'],'roles':user['roles']} if user else None,
-            'identity_ready':True,'provider':'Local','features':{'data_management':cfg.data_management_enabled}}
+            'identity_ready':True,'provider':'Local','features':{'data_management':cfg.data_management_enabled,'maintenance':cfg.maintenance_mode}}
 
 
 @app.post('/api/auth/logout')

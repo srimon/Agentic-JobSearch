@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=('.env','/run/secrets/app_env'), env_prefix='JOBSEARCH_', extra='ignore')
     database_url: str = ''
     data_management_enabled: bool = False
+    maintenance_mode: bool = False
     origin: str = 'http://localhost:3105'
     secure_cookies: bool = False
     session_hours: int = 8
