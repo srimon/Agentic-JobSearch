@@ -156,6 +156,9 @@ def save_status(record):
 
 
 def execute(action, desired='running'):
+    if (ROOT / '.compose-retired').exists() and action in ('start','stop'):
+        event('compose_retired', action=action, message='Enterprise AI Hub owns production lifecycle')
+        return 0
     start = time.monotonic()
     before_library = None
     services = []
