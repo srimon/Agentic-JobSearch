@@ -1,3 +1,5 @@
+> Kubernetes migration progress: Jobsearch production namespace isolation baseline exists with no workloads. Fresh local Jobsearch/Phoenix restore passed. Shared node advertises 4 GiB despite its 12 GiB cgroup limit; platform-owner correction is required before production acceptance. No traffic or writer cutover yet. See docs/playbooks/production-cutover.md.
+
 > Production cutover is reauthorized for Jobsearch only, but has not occurred. Live target-readiness findings and required gates are in docs/playbooks/production-cutover.md.
 
 > Jobsearch-only staging analytics: see docs/playbooks/clickhouse-analytics.md. All new deployment work must target only Jobsearch; never use combined Hub/library rollout scripts.

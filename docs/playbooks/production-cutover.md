@@ -1,3 +1,13 @@
+## Migration progress — 2026-09-13 17:20 UTC
+
+Owner selected complete Kubernetes migration, including target and recovery validation, before switching traffic. The new jobsearch-production namespace baseline is deployed with restricted admission, default-deny networking and zero workloads/PVCs/services. No application data or traffic moved. Earlier findings below are historical.
+
+Fresh Jobsearch-owned recovery rehearsal passed for both Jobsearch and Phoenix: all table contents, sequences and grants matched; encrypted records decrypted; unscoped private-row access was denied. The encrypted archive is retained in Jobsearch/.runtime/production-recovery, using the existing protected wrapping key read-only. Nothing was uploaded. The disconnected temporary recovery server was removed, and all production container identities/start times remained unchanged. The helper derives from Enterprise-AI-Hub/scripts/production_rehearsal.py at 5d62d2a with Jobsearch-only paths and local isolation helpers.
+
+Shared-platform dependency: k3d-ai-hub-pilot-server-0 has cgroup memory.max=12884901888 (12 GiB), while Kubernetes capacity and allocatable both report 4294967Ki (about 4 GiB). Metrics reported 5216Mi usage (124%). Node Ready=True and MemoryPressure=False, but the capacity mismatch is unresolved. No shared node restart, cgroup modification or status patch was performed. The shared-platform owner must reconcile capacity and verify existing applications before production acceptance; do not fake node status to bypass this gate.
+
+Still outstanding: production workload/service/storage and egress manifests; target-storage restore acceptance; production maintenance/write fencing and rollback; sole worker/scheduler/sender ownership; browser/native observability acceptance. The namespace baseline and successful isolated recovery do not complete those gates. Current production remains on Compose at 3105. Staging remains at 3185 and must not be deleted yet.
+
 # Jobsearch-only production cutover status
 
 Owner reauthorized production cutover on 2026-09-13 after successful staging validation. This does not authorize modifications to the shared Hub portal, autonomous library or MBK. Those boundaries remain absolute for this work.
