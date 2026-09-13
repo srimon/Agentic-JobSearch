@@ -17,3 +17,15 @@ def test_unapproved_proxy_fails_before_connection(monkeypatch):
  with patch('ai_core.tools.web_search.socket.create_connection') as connect:
   with pytest.raises(FetchError):PinnedHTTPS('api.ashbyhq.com','1.1.1.1').connect()
   connect.assert_not_called()
+
+
+def test_public_get_retries_transient_connection_failure():
+ from ai_core.tools.web_search import fetch_json
+ with patch('ai_core.tools.web_search.public_addresses',return_value=['1.1.1.1']), patch('ai_core.tools.web_search.PinnedHTTPS') as factory, patch('ai_core.tools.web_search.time.sleep') as sleep:
+  first,second=Mock(),Mock();first.request.side_effect=ConnectionRefusedError()
+  response=second.getresponse.return_value;response.status=200;response.getheader.return_value='application/json';response.read.return_value=b'{"jobs":[]}'
+  factory.side_effect=[first,second]
+  assert fetch_json('https://jobicy.com/api/v2/remote-jobs')=={'jobs':[]}
+  assert factory.call_count==2
+  sleep.assert_called_once_with(1)
+  first.close.assert_called_once();second.close.assert_called_once()

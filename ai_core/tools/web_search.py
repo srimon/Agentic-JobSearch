@@ -74,6 +74,10 @@ def fetch_json(url, max_bytes=20_000_000):
             if len(raw) > max_bytes:
                 raise FetchError('Response exceeded limit')
             return json.loads(raw)
+        except (OSError, http.client.HTTPException) as error:
+            if attempt == 2:
+                raise FetchError('Source connection failed: ' + type(error).__name__) from None
+            time.sleep(2 ** attempt)
         finally:
             conn.close()
     raise FetchError('Retries exhausted')
