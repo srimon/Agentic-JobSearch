@@ -35,6 +35,7 @@ def test_authorization_and_assets(monkeypatch):
             r=c.get('/api/data-model/report/index.html');assert r.status_code==200
             assert r.headers['cache-control']=='no-store'
             assert r.headers['x-frame-options']=='SAMEORIGIN'
+            assert "object-src 'self'" in r.headers['content-security-policy']
             assert "connect-src 'none'" in r.headers['content-security-policy']
             assert c.get('/api/data-model/report/missing.html').status_code==404
             monkeypatch.setattr(data_model,'settings',lambda:SimpleNamespace(database_url='postgresql://localhost/jobsearch'))

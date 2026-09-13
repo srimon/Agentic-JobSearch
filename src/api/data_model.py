@@ -7,7 +7,7 @@ from src.settings import settings
 from src.db.store import connection
 
 HEADERS={'Cache-Control':'no-store','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',
- 'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"}
+ 'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'none'; object-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"}
 
 def valid_path(path):
     return bool(path) and '\\' not in path and '%' not in path and not path.startswith('/') and all(p not in ('.','..','') for p in path.split('/')) and len(path)<512
