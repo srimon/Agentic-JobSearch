@@ -2,6 +2,7 @@
 import http.client
 import ipaddress
 import json
+import os
 import socket
 import ssl
 import time
@@ -27,8 +28,24 @@ class PinnedHTTPS(http.client.HTTPSConnection):
         self.address = address
 
     def connect(self):
-        sock = socket.create_connection((self.address, 443), self.timeout)
-        self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+        proxy = os.environ.get('JOBSEARCH_FETCH_PROXY', '')
+        if proxy:
+            parsed = urlsplit(proxy)
+            if (parsed.scheme != 'http' or parsed.hostname != 'discovery-egress.hub-system.svc.cluster.local'
+                    or parsed.port != 3128 or parsed.username or parsed.password
+                    or parsed.path not in ('', '/') or parsed.query or parsed.fragment):
+                raise FetchError('Unapproved discovery proxy')
+            tunnel = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=self.timeout)
+            tunnel.set_tunnel(self.host, 443)
+            tunnel.connect()
+            sock, tunnel.sock = tunnel.sock, None
+        else:
+            sock = socket.create_connection((self.address, 443), self.timeout)
+        try:
+            self.sock = self._context.wrap_socket(sock, server_hostname=self.host)
+        except Exception:
+            sock.close()
+            raise
 
 
 def fetch_json(url, max_bytes=20_000_000):
