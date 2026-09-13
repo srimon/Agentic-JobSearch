@@ -57,7 +57,7 @@ async def boundaries(request,call_next):
     response.headers['Cache-Control']='no-store'
     response.headers['X-Content-Type-Options']='nosniff'
     response.headers['Referrer-Policy']='no-referrer'
-    response.headers['X-Frame-Options']='SAMEORIGIN' if request.url.path.startswith('/api/monitoring/') else 'DENY'
+    response.headers['X-Frame-Options']='SAMEORIGIN' if request.url.path.startswith(('/api/monitoring/','/api/data-model/report/')) else 'DENY'
     return response
 
 
@@ -313,3 +313,6 @@ app.include_router(monitoring_ui_router(operator))
 
 from src.api.data_quality import create_router as quality_router
 app.include_router(quality_router(operator))
+
+from src.api.data_model import create_router as data_model_router
+app.include_router(data_model_router(operator))
