@@ -19,3 +19,13 @@ def test_explicit_production_opt_in(module,path,monkeypatch):
  cfg.data_management_enabled=True
  result=client.get(path);assert result.status_code==200
  assert result.json().get('status','not_generated')=='not_generated'
+
+
+def test_session_advertises_runtime_capability(monkeypatch):
+ from src.api import main
+ monkeypatch.setattr(main.cfg,'data_management_enabled',True)
+ response=TestClient(main.app).get('/api/session')
+ assert response.status_code==200
+ assert response.json()['features']['data_management'] is True
+ monkeypatch.setattr(main.cfg,'data_management_enabled',False)
+ assert TestClient(main.app).get('/api/session').json()['features']['data_management'] is False

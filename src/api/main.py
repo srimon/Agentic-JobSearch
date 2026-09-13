@@ -89,7 +89,7 @@ def session(request:Request):
     try: user=current_user(request)
     except HTTPException: user=None
     return {'user': {'name':user['display_name'],'roles':user['roles']} if user else None,
-            'identity_ready':True,'provider':'Local'}
+            'identity_ready':True,'provider':'Local','features':{'data_management':cfg.data_management_enabled}}
 
 
 @app.post('/api/auth/logout')
