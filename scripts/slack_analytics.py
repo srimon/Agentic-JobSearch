@@ -4,7 +4,7 @@ from pathlib import Path
 from urllib.request import Request,build_opener
 import re
 from urllib.request import HTTPRedirectHandler
-SECRET=Path('/home/srimonadi/Enterprise-AI-Hub-jobsearch/.secrets/slack/config.json')
+SECRET=Path('/home/srimonadi/Enterprise-AI-Hub/.secrets/slack/config.json')  # the hub's one Slack configuration, in the canonical root since 14 Sep 2026
 def valid_url(value):return bool(re.fullmatch(r'https://hooks\.slack\.com/services/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+/[A-Za-z0-9_-]+',value))
 class NoRedirect(HTTPRedirectHandler):
  def redirect_request(self,*args,**kwargs):return None
