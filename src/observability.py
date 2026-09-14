@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from prometheus_client import Counter,Histogram,Gauge,start_http_server,REGISTRY
 from prometheus_client.core import GaugeMetricFamily
 from opentelemetry import trace
+from opentelemetry.trace import StatusCode
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -81,8 +82,18 @@ def collection_span(run):
     started=time.monotonic()
     with trace.get_tracer('jobsearch').start_as_current_span('source.collect',record_exception=False,set_status_on_exception=False) as span:
         span.set_attribute('source.id',run['source_id']); span.set_attribute('source.provider',run['provider']); span.set_attribute('run.id',str(run['id']))
+        # This context covers fetch/normalization; database completion is recorded
+        # separately by the worker's durable run state and collection events.
+        span.set_attribute('collection.phase','fetch')
         event('collection.started',run_id=str(run['id']),source_id=run['source_id'],provider=run['provider'])
-        try: yield span
+        try:
+            yield span
+        except Exception as error:
+            span.set_attribute('error.type',type(error).__name__)
+            span.set_status(StatusCode.ERROR)
+            raise
+        else:
+            span.set_status(StatusCode.OK)
         finally: DURATION.labels(run['provider']).observe(time.monotonic()-started)
 
 
