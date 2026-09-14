@@ -85,6 +85,58 @@
       "status": "Manual search link",
       "detail": "Preserved from the original PrepPilot source directory. Open the site to search; this link does not enable an automated feed or application submission.",
       "url": "https://www.google.com/search?q=site%3Ajobs.lever.co+director+data+engineering+United+States"
+    },
+    {
+      "name": "The Muse",
+      "url": "https://www.themuse.com/search/",
+      "detail": "Original PrepPilot provider preserved as a manual search destination. Its feed has not been connected to the consolidated collector.",
+      "status": "Manual search link"
+    },
+    {
+      "name": "Himalayas",
+      "url": "https://himalayas.app/jobs",
+      "detail": "Original PrepPilot remote-job provider preserved as a manual search destination. Its feed has not been connected to the consolidated collector.",
+      "status": "Manual search link"
+    },
+    {
+      "name": "Jooble",
+      "url": "https://jooble.org/",
+      "detail": "Original PrepPilot optional provider. Automated API access requires separately configured credentials; manual search is available here.",
+      "status": "Manual search link"
+    },
+    {
+      "name": "USAJOBS",
+      "url": "https://www.usajobs.gov/Search/Results?k=data",
+      "detail": "Federal job search from the original PrepPilot provider directory. Review each position\u2019s eligibility. Automated API credentials are not configured.",
+      "status": "Manual search link"
+    },
+    {
+      "name": "Adzuna",
+      "url": "https://www.adzuna.com/search?q=director+data+engineering",
+      "detail": "Original PrepPilot optional provider. Automated API credentials are not configured; this opens the US job search site.",
+      "status": "Manual search link"
+    }
+  ],
+  "optional_search_apis": [
+    {
+      "name": "JSearch",
+      "status": "Not configured in consolidated Jobsearch",
+      "purpose": "Original PrepPilot optional search adapter; no credentials or paid access implied"
+    },
+    {
+      "name": "Serper",
+      "status": "Not configured in consolidated Jobsearch",
+      "purpose": "Original PrepPilot optional search adapter; no credentials or paid access implied"
+    },
+    {
+      "name": "Google Custom Search",
+      "status": "Not configured in consolidated Jobsearch",
+      "purpose": "Original PrepPilot optional search adapter; no credentials or paid access implied"
+    },
+    {
+      "name": "Brave Search",
+      "status": "Not configured in consolidated Jobsearch",
+      "purpose": "Original PrepPilot optional search adapter; no credentials or paid access implied"
     }
   ]
 }
