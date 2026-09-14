@@ -1,5 +1,6 @@
 export default function JobBoards(){
  const boards=[
+ {name:'Greenhouse & Ashby',status:'Public employer boards connected',detail:'The consolidated catalog includes 55 additional verified public employer boards brought in from the preparation app. They use the existing discovery, matching and duplicate controls. Per-board freshness is shown below.',url:'https://www.greenhouse.com/job-board'},
  {name:'Craigslist',status:'Regional search links only - automated ingestion not connected',detail:'Choose your US city or region to browse jobs and configure native search alerts. Automated content collection requires permission under Craigslist terms.',url:'https://www.craigslist.org/about/sites#US'},
  {name:'Google',status:'Search link only — automated ingestion not connected',detail:'Google job discovery is available through its website. Custom Search JSON API is closed to new customers; no paid search service is configured.',url:'https://www.google.com/search?q=director+data+engineering+jobs+United+States'},
  {name:'Jobicy',status:'Public feed connected',detail:'Latest 200 US remote jobs, with source attribution. Scheduled every six hours.',url:'https://jobicy.com/jobs'},
