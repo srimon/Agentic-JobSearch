@@ -10,7 +10,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from src.settings import settings
 from src.db.store import connection, audit
-from src.applications.private import private_connection, decrypt, encrypt
+from src.applications.private import private_connection, decrypt, encrypt, application_summaries
 from src.applications.dismissals import dismissal_for
 from src.applications.archives import archive_for,require_active,archive_if_emailed
 from ai_core.agents.supervisor import enqueue
@@ -130,11 +130,9 @@ def jobs(q:str=Query('',max_length=200),date:Literal['any','24h','7d','30d']='an
         if sort=='recommended' and view!='archive':
             rows.sort(key=lambda row:-row['learning']['adjustment'])
             rows=rows[(page-1)*25:page*25]
+        summaries=application_summaries(conn,user['id'],[row['id'] for row in rows])
         for row in rows:
-            record=conn.execute('SELECT payload FROM jobsearch.private_applications WHERE user_id=%s AND job_id=%s',(user['id'],row['id'])).fetchone()
-            report=decrypt(user['id'],'application:'+str(row['id']),record['payload']) if record else {}
-            row['application_status']=report.get('status')
-            row['next_action']=report.get('next_action')
+            row.update(summaries.get(str(row['id']),{'application_status':None,'next_action':None}))
     return {'items':rows,'total':total,'page':page,'page_size':25}
 
 

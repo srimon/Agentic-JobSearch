@@ -13,7 +13,7 @@ import os
 import socket
 from ai_core.agents.leases import claim, heartbeat, require_lease, fail, LeaseLost
 from psycopg.types.json import Jsonb
-from ai_core.agents.researcher import collect
+from ai_core.agents.researcher import collect, collect_snapshot
 from src.db.store import connection, audit
 from src.pipelines.classification import classify
 from src.settings import settings
@@ -32,6 +32,11 @@ def enqueue(conn, source_id, actor):
     return row
 
 
+def reconcile_availability(conn, run, snapshot):
+    if snapshot.complete_board:
+        conn.execute("UPDATE jobsearch.jobs SET availability='not_observed' WHERE source_id=%s AND last_seen_at < %s", (run['source_id'], run['created_at']))
+
+
 def run_one(worker_id=None):
     worker_id=worker_id or (socket.gethostname()+':'+str(os.getpid()))
     with claim(worker_id) as run:
@@ -39,7 +44,8 @@ def run_one(worker_id=None):
         with heartbeat(run) as lost:
             try:
                 with collection_span(run) as span:
-                    jobs=collect(run)
+                    snapshot=collect_snapshot(run, collector=collect)
+                    jobs=snapshot.jobs
                     run_trace_id=format(span.get_span_context().trace_id,'032x')
                 if lost.is_set(): raise LeaseLost()
                 decisions=Counter()
@@ -68,11 +74,11 @@ def run_one(worker_id=None):
                         conn.execute('INSERT INTO jobsearch.jobs(id,source_id,'+','.join(fields)+',content_hash,evidence) VALUES('+','.join(['%s']*16)+") ON CONFLICT(source_id,source_job_id) DO UPDATE SET "+','.join(f'{x}=excluded.{x}' for x in fields[1:])+",content_hash=excluded.content_hash,evidence=excluded.evidence,last_seen_at=now(),availability='observed_open'",
                             [job_id,run['source_id']]+[job[x] for x in fields]+[digest,Jsonb(job['evidence'])])
                         conn.execute('INSERT INTO jobsearch.observations(job_id,run_id,content_hash,evidence) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING',(job_id,run['id'],digest,Jsonb(job['evidence'])))
-                    conn.execute("UPDATE jobsearch.jobs SET availability='not_observed' WHERE source_id=%s AND last_seen_at < %s",(run['source_id'],run['created_at']))
+                    reconcile_availability(conn, run, snapshot)
                     conn.execute("UPDATE jobsearch.runs SET status='completed',finished_at=now(),lease_token=NULL,lease_expires_at=NULL,fetched=%s,matched=%s WHERE id=%s",(len(jobs),count,run['id']))
                     conn.execute('UPDATE jobsearch.runs SET decision_counts=%s,trace_id=%s WHERE id=%s',(Jsonb(dict(decisions)),run_trace_id,run['id']))
                     conn.execute('UPDATE jobsearch.sources SET last_success_at=now(),last_error=NULL WHERE id=%s',(run['source_id'],))
-                    audit(conn,'collector','tool.fetch.complete',run['source_id'],details={'run_id':str(run['id']),'fetched':len(jobs),'candidates':count})
+                    audit(conn,'collector','tool.fetch.complete',run['source_id'],details={'run_id':str(run['id']),'fetched':len(jobs),'candidates':count,'complete_board':snapshot.complete_board})
                 RUNS.labels(run['provider'],'completed').inc()
                 for decision,n in decisions.items(): DECISIONS.labels(decision).inc(n)
                 event('collection.completed',run_id=str(run['id']),source_id=run['source_id'],fetched=len(jobs),accepted=decisions['match'])

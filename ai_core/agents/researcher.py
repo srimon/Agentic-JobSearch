@@ -1,9 +1,27 @@
 """Deterministic ATS collection; no model or credentials are exposed to content."""
 import re
 import time
+from dataclasses import dataclass
 from ai_core.tools.web_search import fetch_json
 from src.guardrails.content import plain_text, safe_link
 from src.pipelines.classification import posting_date, title_match
+
+
+@dataclass(frozen=True)
+class CollectionResult:
+    jobs: list
+    complete_board: bool
+
+
+def collect_snapshot(source, *, collector=None):
+    """Only fully paginated employer boards can establish absence.
+
+    Search results and public feeds are windows, even if every requested page
+    succeeded or the window returned no matching jobs.
+    """
+    jobs = (collector or collect)(source)
+    complete = source['provider'] in {'ashby', 'greenhouse', 'lever'}
+    return CollectionResult(jobs=jobs, complete_board=complete)
 
 
 def collect(source):

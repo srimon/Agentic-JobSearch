@@ -21,6 +21,23 @@ def decrypt(user_id,kind,value):
     raw=bytes(value)
     return json.loads(cipher().decrypt(raw[:12],raw[12:],f'{user_id}:{kind}:v1'.encode()))
 
+def application_summaries(conn, user_id, job_ids):
+    """Read only the displayed page, under the caller's owner transaction."""
+    if not job_ids:
+        return {}
+    if len(job_ids) > 25:
+        raise ValueError('Application summary page exceeds 25 jobs')
+    records = conn.execute(
+        'SELECT job_id,payload FROM jobsearch.private_applications WHERE user_id=%s AND job_id=ANY(%s::uuid[])',
+        (user_id, list(job_ids)),
+    ).fetchall()
+    result = {}
+    for record in records:
+        job_id = str(record['job_id'])
+        report = decrypt(user_id, 'application:' + job_id, record['payload'])
+        result[job_id] = {'application_status': report.get('status'), 'next_action': report.get('next_action')}
+    return result
+
 @contextmanager
 def private_connection(user_id):
     with connection() as c:
