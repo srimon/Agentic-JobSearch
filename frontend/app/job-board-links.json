@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "upstream": "srimon/PrepPilot-@17cfef1aae7986596d99d6de0768258e99abb308",
+  "boards": [
+    {
+      "name": "Craigslist",
+      "status": "Regional search links only - automated ingestion not connected",
+      "detail": "Choose your US city or region to browse jobs and configure native search alerts. Automated content collection requires permission under Craigslist terms.",
+      "url": "https://www.craigslist.org/about/sites#US"
+    },
+    {
+      "name": "Google",
+      "status": "Search link only \u2014 automated ingestion not connected",
+      "detail": "Google job discovery is available through its website. Custom Search JSON API is closed to new customers; no paid search service is configured.",
+      "url": "https://www.google.com/search?q=director+data+engineering+jobs+United+States"
+    },
+    {
+      "name": "Jobicy",
+      "status": "Public feed connected",
+      "detail": "Latest 200 US remote jobs, with source attribution. Scheduled every six hours.",
+      "url": "https://jobicy.com/jobs"
+    },
+    {
+      "name": "Remotive",
+      "status": "Public feed connected",
+      "detail": "Remote job feed with a 24-hour publication delay. Checked at most once every six hours.",
+      "url": "https://remotive.com"
+    },
+    {
+      "name": "Dice",
+      "status": "Automated search connected",
+      "detail": "Public MCP search. US leadership queries; up to 200 results per query per run. Duplicates are removed within the source.",
+      "url": "https://www.dice.com/jobs"
+    },
+    {
+      "name": "Indeed",
+      "status": "Search link only \u2014 automated ingestion not connected",
+      "detail": "Partner-approved API access and credentials are required for the documented search integration.",
+      "url": "https://www.indeed.com/jobs?q=director+data+engineering&l=United+States"
+    },
+    {
+      "name": "LinkedIn",
+      "status": "Search link only \u2014 automated ingestion not connected",
+      "detail": "A general job-search data integration has not been configured. The job-posting API is not a replacement.",
+      "url": "https://www.linkedin.com/jobs/search/?keywords=Director%20Data%20Engineering&location=United%20States"
+    },
+    {
+      "name": "Monster",
+      "status": "Search link only \u2014 automated ingestion not connected",
+      "detail": "No supported public search API has been verified. Requires an approved feed or integration.",
+      "url": "https://www.monster.com/jobs"
+    },
+    {
+      "name": "Glassdoor",
+      "status": "Manual search link",
+      "detail": "Preserved from the original PrepPilot source directory. Open the site to search; this link does not enable an automated feed or application submission.",
+      "url": "https://www.glassdoor.com/Job/index.htm"
+    },
+    {
+      "name": "ZipRecruiter",
+      "status": "Manual search link",
+      "detail": "Preserved from the original PrepPilot source directory. Open the site to search; this link does not enable an automated feed or application submission.",
+      "url": "https://www.ziprecruiter.com/jobs-search"
+    },
+    {
+      "name": "Built In",
+      "status": "Manual search link",
+      "detail": "Preserved from the original PrepPilot source directory. Open the site to search; this link does not enable an automated feed or application submission.",
+      "url": "https://builtin.com/jobs"
+    },
+    {
+      "name": "SimplyHired",
+      "status": "Manual search link",
+      "detail": "Preserved from the original PrepPilot source directory. Open the site to search; this link does not enable an automated feed or application submission.",
+      "url": "https://www.simplyhired.com/search?q=director+data+engineering"
+    },
+    {
+      "name": "Workday employer sites",
+      "status": "Manual search link",
+      "detail": "Preserved from the original PrepPilot source directory. Open the site to search; this link does not enable an automated feed or application submission.",
+      "url": "https://www.google.com/search?q=site%3Amyworkdayjobs.com%2Fjob+director+data+engineering+United+States"
+    },
+    {
+      "name": "Lever employer sites",
+      "status": "Manual search link",
+      "detail": "Preserved from the original PrepPilot source directory. Open the site to search; this link does not enable an automated feed or application submission.",
+      "url": "https://www.google.com/search?q=site%3Ajobs.lever.co+director+data+engineering+United+States"
+    }
+  ]
+}
