@@ -106,6 +106,12 @@ def logout(request:Request,user=Depends(current_user)):
     response=JSONResponse({'ok':True}); response.delete_cookie('jobsearch_session'); return response
 
 
+@app.get('/api/hub/prep-identity')
+def prep_identity(user=Depends(current_user)):
+    if not set(user['roles']) & {'member','operator','administrator'}: raise HTTPException(403,'Member role required')
+    return {'subject':'jobsearch:'+str(user['id']),'name':user['display_name'],'roles':user['roles']}
+
+
 @app.get('/api/jobs')
 def jobs(q:str=Query('',max_length=200),date:Literal['any','24h','7d','30d']='any',level:str='',
          mode:Literal['','Remote','Hybrid','On-site','Unknown']='',view:Literal['matches','review','saved','emailed','archive']='matches',
