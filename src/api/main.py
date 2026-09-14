@@ -14,7 +14,7 @@ from src.applications.private import private_connection, decrypt, encrypt, appli
 from src.applications.dismissals import dismissal_for
 from src.applications.archives import archive_for,require_active,archive_if_emailed
 from ai_core.agents.supervisor import enqueue
-from src.applications.learning import current as learning_model,explain as learning_explain,configure as configure_learning
+from src.applications.learning import current as learning_model,explain as learning_explain,configure as configure_learning,ranking_sql
 
 cfg=settings()
 app=FastAPI(title='Jobsearch',docs_url=None,redoc_url=None)
@@ -123,13 +123,15 @@ def jobs(q:str=Query('',max_length=200),date:Literal['any','24h','7d','30d']='an
     if not show_dismissed and view!='archive': clauses.append('d.reason IS NULL')
     base=' FROM jobsearch.jobs j LEFT JOIN jobsearch.saved_jobs s ON s.job_id=j.id AND s.user_id=%s LEFT JOIN LATERAL (SELECT reason FROM jobsearch.job_dismissals WHERE user_id=%s AND (job_id=j.id OR identity=jobsearch.posting_identity(j.url)) ORDER BY updated_at DESC LIMIT 1) d ON true LEFT JOIN LATERAL (SELECT max(emailed_at) AS last_emailed_at FROM jobsearch.emailed_jobs WHERE user_id=%s AND job_id=j.id) e ON true LEFT JOIN jobsearch.job_archives a ON a.user_id=%s AND a.identity=jobsearch.posting_identity(j.url) WHERE '+' AND '.join(clauses)
     with private_connection(user['id']) as conn:
-        total=conn.execute('SELECT count(*) AS n'+base,[user['id']]*4+values).fetchone()['n']
-        rows=conn.execute('SELECT j.id,j.source_id,j.title,j.company,j.location,j.work_mode,j.level,j.match_status,j.reason,j.evidence,j.posted_at,j.first_seen_at,j.last_seen_at,j.url,j.country_status,(s.user_id IS NOT NULL) AS saved,s.stage,d.reason AS dismissal_reason,e.last_emailed_at,a.archived_at,a.final_status'+base+(' ORDER BY e.last_emailed_at DESC,j.id' if view=='emailed' else ' ORDER BY a.archived_at DESC,j.id' if view=='archive' else ' ORDER BY j.posted_at DESC NULLS LAST,j.id')+('' if sort=='recommended' and view!='archive' else ' LIMIT 25 OFFSET %s'),[user['id']]*4+values+([] if sort=='recommended' and view!='archive' else [(page-1)*25])).fetchall()
         model=learning_model(conn,user['id'])
-        for row in rows:row['learning']=learning_explain(row,model)
+        order='e.last_emailed_at DESC,j.id' if view=='emailed' else ('a.archived_at DESC,j.id' if view=='archive' else 'j.posted_at DESC NULLS LAST,j.id')
+        ranking_params=[]
         if sort=='recommended' and view!='archive':
-            rows.sort(key=lambda row:-row['learning']['adjustment'])
-            rows=rows[(page-1)*25:page*25]
+            score,ranking_params=ranking_sql(model)
+            order=score+' DESC,'+order
+        total=conn.execute('SELECT count(*) AS n'+base,[user['id']]*4+values).fetchone()['n']
+        rows=conn.execute('SELECT j.id,j.source_id,j.title,j.company,j.location,j.work_mode,j.country_status,j.level,j.match_status,j.reason,j.evidence,j.posted_at,j.first_seen_at,j.last_seen_at,j.url,(s.user_id IS NOT NULL) AS saved,s.stage,d.reason AS dismissal_reason,e.last_emailed_at,a.archived_at,a.final_status'+base+' ORDER BY '+order+' LIMIT 25 OFFSET %s',[user['id']]*4+values+ranking_params+[(page-1)*25]).fetchall()
+        for row in rows:row['learning']=learning_explain(row,model)
         summaries=application_summaries(conn,user['id'],[row['id'] for row in rows])
         for row in rows:
             row.update(summaries.get(str(row['id']),{'application_status':None,'next_action':None}))

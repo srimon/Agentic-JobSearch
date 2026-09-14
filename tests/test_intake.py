@@ -291,7 +291,12 @@ def test_archive_canonical_owner_scope(client):
 def test_learning_versions_controls_and_isolation(client):
     first=client.get('/api/learning').json()['model']
     assert first['enabled'] and first['rules']==[]
+    assert first['version']==0
     assert client.get('/api/learning').json()['model']['version']==first['version']
+    assert client.get('/api/learning').json()['history']==[]
+    assert client.put('/api/learning',json={'action':'resume'},headers=HEADERS).status_code==200
+    first=client.get('/api/learning').json()['model']
+    assert first['version']>0
     assert client.put('/api/learning',json={'action':'pause'},headers=HEADERS).status_code==200
     assert not client.get('/api/learning').json()['model']['enabled']
     assert client.put('/api/learning',json={'action':'reset'},headers=HEADERS).status_code==200
@@ -317,6 +322,7 @@ def test_learning_feedback_preserves_archive_lock(client):
 
 def test_recommended_ranking_before_pagination(client):
     from src.applications.private import private_connection
+    from src.applications.learning import refresh
     with private_connection(client.users[0]['id']) as c:
         c.execute("UPDATE jobsearch.jobs SET title='Director Data Engineering',posted_at=now()-interval '20 days' WHERE id=%s",(client.jid,))
         for n in range(30):
@@ -325,12 +331,157 @@ def test_recommended_ranking_before_pagination(client):
             url='https://example.com/ranking/'+str(n)
             c.execute("INSERT INTO jobsearch.jobs(id,source_id,source_job_id,company,title,location,work_mode,country_status,level,match_status,reason,description,url,content_hash,posted_at) SELECT %s,source_id,%s,company,%s,location,work_mode,country_status,level,match_status,reason,description,%s,content_hash,now() FROM jobsearch.jobs WHERE id=%s",(jid,'ranking-'+str(n),title,url,client.jid))
             if n<3:c.execute("INSERT INTO jobsearch.job_archives(user_id,identity,job_id,final_status) VALUES(%s,%s,%s,'applied')",(client.users[0]['id'],url,jid))
+        refresh(c,client.users[0]['id'])
     newest=client.get('/api/jobs?sort=newest').json()
     ranked=client.get('/api/jobs?sort=recommended').json()
     assert str(client.jid) not in [j['id'] for j in newest['items']]
     assert ranked['items'][0]['id']==str(client.jid)
     assert newest['total']==ranked['total']==28
     assert ranked['items'][0]['learning']['reasons']
+
+
+def test_learning_reads_never_train_write_or_lock(client, monkeypatch):
+    from src.applications import learning
+    from contextlib import contextmanager
+    from src.api import main
+    real = main.private_connection
+    statements=[]
+    @contextmanager
+    def observed(uid):
+        with real(uid) as c:
+            class Proxy:
+                def execute(self, query, params=None):
+                    statements.append(query)
+                    return c.execute(query, params)
+            yield Proxy()
+    monkeypatch.setattr(main,'private_connection',observed)
+    monkeypatch.setattr(learning,'train',lambda _:pytest.fail('Read attempted training'))
+    for path in ('/api/jobs?sort=recommended','/api/jobs?sort=newest','/api/learning'):
+        assert client.get(path).status_code==200
+    assert all(q.lstrip().upper().startswith('SELECT') for q in statements)
+    assert all('pg_advisory' not in q and 'a.feedback_reason' not in q for q in statements)
+    with connection() as c:
+        assert c.execute('SELECT count(*) n FROM jobsearch.learning_versions').fetchone()['n']==0
+
+
+def test_snapshot_refresh_is_idempotent_and_revisited_evidence_becomes_current(client):
+    from src.applications.private import private_connection
+    from src.applications.learning import refresh,current,configure
+    uid=client.users[0]['id']
+    with private_connection(uid) as c:
+        c.execute("INSERT INTO jobsearch.job_archives(user_id,identity,job_id,final_status) VALUES(%s,'test',%s,'applied')",(uid,client.jid))
+        first=refresh(c,uid)
+        assert refresh(c,uid)['version']==first['version']
+        c.execute("UPDATE jobsearch.jobs SET title='Director Analytics' WHERE id=%s",(client.jid,))
+        second=refresh(c,uid)
+        assert second['version']>first['version']
+        c.execute("UPDATE jobsearch.jobs SET title='Director Data Engineering' WHERE id=%s",(client.jid,))
+        third=refresh(c,uid)
+        assert third['version']>second['version']
+        assert current(c,uid)['version']==third['version']
+        assert third['evidence_fingerprint']==first['evidence_fingerprint']
+        configure(c,uid,'restore',first['version'])
+        assert refresh(c,uid)['version']==first['version']
+        configure(c,uid,'resume')
+        assert current(c,uid)['version']==third['version']
+
+
+def test_concurrent_refresh_publishes_one_version(client):
+    from concurrent.futures import ThreadPoolExecutor
+    from src.applications.private import private_connection
+    from src.applications.learning import refresh
+    uid=client.users[0]['id']
+    def publish(_):
+        with private_connection(uid) as c: return refresh(c,uid)['version']
+    with ThreadPoolExecutor(4) as pool:
+        versions=list(pool.map(publish,range(4)))
+    assert len(set(versions))==1
+    with private_connection(uid) as c:
+        assert c.execute('SELECT count(*) n FROM jobsearch.learning_versions WHERE user_id=%s',(uid,)).fetchone()['n']==1
+
+
+def test_feedback_and_model_publish_are_atomic(client, monkeypatch):
+    from src.applications.private import private_connection
+    from src.applications.email_history import record_report
+    from src.applications import learning
+    uid=client.users[0]['id']
+    with private_connection(uid) as c: record_report(c,uid,'a'*64,[client.jid],accepted=True)
+    def fail(_): raise RuntimeError('Simulated training failure')
+    monkeypatch.setattr(learning,'train',fail)
+    with pytest.raises(RuntimeError,match='Simulated training failure'):
+        client.put(f'/api/jobs/{client.jid}/dismissal',json={'reason':'spam'},headers=HEADERS)
+    with private_connection(uid) as c:
+        for table in ('job_archives','job_dismissals','learning_versions'):
+            assert c.execute('SELECT count(*) n FROM jobsearch.'+table+' WHERE user_id=%s',(uid,)).fetchone()['n']==0
+
+
+@pytest.mark.parametrize('enabled',[True,False])
+def test_sql_scores_match_python_explanations(client, enabled):
+    from src.applications.learning import ranking_sql,explain
+    model={'enabled':enabled,'version':1,'rules':[
+        {'feature':f,'weight':w,'reason':'Fixture'} for f,w in [
+            ('function:Data engineering',6),('function:Data management',-6),
+            ('function:Analytics',3),('function:AI',6),('level:Director',6),
+            ('workplace:Remote',6),('source:1',-6),('source:1',-6),
+            ('workplace:Unknown',6),('level:',6),('unrecognized:feature',6)]]}
+    expression,params=ranking_sql(model)
+    for title in ('Director Data Engineering & AI','AI_Data governance','fair data quality',
+                  'DIRECTOR ARTIFICIAL INTELLIGENCE','Director business intelligence',
+                  'Director data infrastructure / machine learning','Director AI—Data Management'):
+        for level,mode,source in [('Director','Remote',2),('','Unknown',1),(None,None,1)]:
+            job={'title':title,'level':level,'work_mode':mode,'source_id':source}
+            with connection() as c:
+                value=c.execute('SELECT '+expression+' AS score FROM (SELECT %s::text title,%s::text level,%s::text work_mode,%s::bigint source_id) j',params+[title,level,mode,source]).fetchone()['score']
+            assert value==explain(job,model)['adjustment']
+
+
+def test_recommended_large_inventory_is_bounded_and_matches_reference(client, monkeypatch):
+    from src.applications.private import private_connection
+    from src.applications.learning import refresh,explain,ranking_sql
+    from src.api import main
+    from contextlib import contextmanager
+    uid=client.users[0]['id']
+    with private_connection(uid) as c:
+        c.execute("""INSERT INTO jobsearch.jobs(id,source_id,source_job_id,company,title,location,work_mode,country_status,level,match_status,reason,description,url,content_hash,posted_at)
+          SELECT md5('ranking-fixture-'||n)::uuid,source_id,'scale-'||n,company,
+          CASE WHEN n%%3=0 THEN 'Director Data Engineering' ELSE 'Director Analytics' END,
+          location,work_mode,country_status,level,match_status,reason,description,'https://example.com/scale/'||n,content_hash,
+          CASE WHEN n%%7=0 THEN NULL ELSE now()-(n%%10)*interval '1 day' END
+          FROM jobsearch.jobs CROSS JOIN generate_series(1,1000) n WHERE id=%s""",(client.jid,))
+        c.execute("""INSERT INTO jobsearch.job_archives(user_id,identity,job_id,final_status)
+          SELECT %s,url,id,'applied' FROM jobsearch.jobs WHERE source_job_id IN ('scale-3','scale-6','scale-9')""",(uid,))
+        model=refresh(c,uid)
+    queries=[];real=main.private_connection
+    @contextmanager
+    def observed(owner):
+        with real(owner) as c:
+            class Proxy:
+                def execute(self,q,p=None):
+                    cursor=c.execute(q,p)
+                    if q.startswith('SELECT j.id'):
+                        rows=cursor.fetchall();queries.append((q,p,len(rows)))
+                        class Rows:
+                            def fetchall(self): return rows
+                        return Rows()
+                    return cursor
+            yield Proxy()
+    monkeypatch.setattr(main,'private_connection',observed)
+    first=client.get('/api/jobs?sort=recommended').json()
+    second=client.get('/api/jobs?sort=recommended&page=2').json()
+    assert first['total']==998 and second['total']==998
+    assert [n for _,_,n in queries]==[25,25]
+    query,params,_=queries[0]
+    # Reference reproduces the previous all-row Python ranking for exactly
+    # the same filtered owner query and chronological/UUID tie order.
+    reference_query=query.rsplit(' ORDER BY ',1)[0]+' ORDER BY j.posted_at DESC NULLS LAST,j.id'
+    _,score_params=ranking_sql(model)
+    with private_connection(uid) as c:
+        reference=c.execute(reference_query,params[:-(len(score_params)+1)]).fetchall()
+    assert len(reference)==998
+    reference.sort(key=lambda row:-explain(row,model)['adjustment'])
+    actual=[r['id'] for r in first['items']+second['items']]
+    assert actual==[str(r['id']) for r in reference[:50]]
+    assert len(set(actual))==50
 
 @pytest.mark.parametrize('reason',['spam','fake_posting'])
 def test_spam_flags_archive_and_block(client,reason):
