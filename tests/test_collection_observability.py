@@ -73,7 +73,9 @@ def test_observed_exclusion_retires_old_match_without_changing_owner_state(sourc
     @contextmanager
     def restricted():
         with connection() as c:
-            c.execute('SET LOCAL ROLE jobsearch_worker')
+            c.autocommit = True
+            c.execute('SET ROLE jobsearch_worker')
+            c.autocommit = False
             yield c
 
     monkeypatch.setattr(supervisor, 'connection', restricted)
