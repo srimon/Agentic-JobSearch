@@ -30,7 +30,7 @@ def verify_isolation(item,name):
  if host['NetworkMode']!='none' or host.get('PortBindings') or host.get('Binds'):raise RuntimeError('Recovery isolation mismatch')
  if any(m['Type']!='tmpfs' for m in item.get('Mounts',[])):raise RuntimeError('Recovery storage must be temporary')
 stage=SimpleNamespace(ROOT=ROOT,SOURCE=ROOT,production_snapshot=production_snapshot)
-backup=SimpleNamespace(KEY=Path('/home/srimonadi/Enterprise-AI-Hub-jobsearch/.secrets/staging-backup.key'),private_write=private_write)
+backup=SimpleNamespace(KEY=Path('/home/srimonadi/Enterprise-AI-Hub/.secrets/staging-backup.key'),private_write=private_write)
 
 AAD = b'jobsearch-production-local-rehearsal-v1'
 FOLDER = ROOT / '.runtime/production-recovery'
