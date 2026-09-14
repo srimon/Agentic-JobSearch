@@ -27,7 +27,7 @@ def collect_snapshot(source, *, collector=None):
 def collect(source):
     provider,board=source['provider'],source['board']
     if not re.fullmatch(r'[A-Za-z0-9_-]{1,100}',board): raise ValueError('Invalid board identifier')
-    if provider in ('jobicy','remotive'):
+    if provider in ('jobicy','remotive','himalayas'):
         from ai_core.tools.public_feeds import collect_public
         return collect_public(provider)
     if provider=='dice':

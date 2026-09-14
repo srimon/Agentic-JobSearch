@@ -95,8 +95,8 @@
     {
       "name": "Himalayas",
       "url": "https://himalayas.app/jobs",
-      "detail": "Original PrepPilot remote-job provider preserved as a manual search destination. Its feed has not been connected to the consolidated collector.",
-      "status": "Manual search link"
+      "detail": "Public API for US Director and Executive listings, processed by the existing role, location and archive rules. Bounded to 100 results per run; source refreshed by the daily workflow with a six-hour minimum between checks. Data sourced from Himalayas; original posting links are retained.",
+      "status": "Public search feed connected"
     },
     {
       "name": "Jooble",

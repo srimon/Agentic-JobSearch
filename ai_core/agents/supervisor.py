@@ -22,7 +22,7 @@ from src.settings import settings
 def enqueue(conn, source_id, actor):
     source=conn.execute('SELECT provider,enabled FROM jobsearch.sources WHERE id=%s FOR UPDATE',(source_id,)).fetchone()
     if not source or not source['enabled']: return None
-    cooldown={'remotive':6,'jobicy':1}.get(source['provider'],0) if source else 0
+    cooldown={'remotive':6,'jobicy':1,'himalayas':6}.get(source['provider'],0) if source else 0
     if cooldown and conn.execute("SELECT 1 FROM jobsearch.runs WHERE source_id=%s AND created_at>now()-(%s * interval '1 hour') LIMIT 1",(source_id,cooldown)).fetchone():
         return None
     run_id=uuid.uuid4()

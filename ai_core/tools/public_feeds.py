@@ -3,6 +3,9 @@ from src.guardrails.content import plain_text,safe_link
 from src.pipelines.classification import posting_date
 
 def collect_public(provider):
+    if provider=='himalayas':
+        from ai_core.tools.himalayas import collect_himalayas
+        return collect_himalayas()
     if provider=='jobicy':
         payload=fetch_json('https://jobicy.com/api/v2/remote-jobs?count=200&geo=usa')
     elif provider=='remotive':

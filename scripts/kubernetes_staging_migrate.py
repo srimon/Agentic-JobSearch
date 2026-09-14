@@ -13,8 +13,11 @@ from psycopg import sql
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MIGRATIONS = sorted((ROOT / "src/db").glob("[0-9][0-9][0-9]_*.sql"))
 EXPECTED_VERSIONS = list(range(1, 14))
+# Retained historical staging replay stays pinned to its original 13 versions.
+# New production migrations must not silently extend a retired replay target.
+MIGRATIONS = [p for p in sorted((ROOT / "src/db").glob("[0-9][0-9][0-9]_*.sql"))
+              if int(p.name[:3]) in EXPECTED_VERSIONS]
 
 
 class StagingMigrationError(RuntimeError):

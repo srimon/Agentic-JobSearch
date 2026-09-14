@@ -8,7 +8,7 @@ import ssl
 import time
 from urllib.parse import urlsplit
 
-HOSTS = {'api.ashbyhq.com', 'boards-api.greenhouse.io', 'api.lever.co', 'jobicy.com', 'remotive.com'}
+HOSTS = {'api.ashbyhq.com', 'boards-api.greenhouse.io', 'api.lever.co', 'jobicy.com', 'remotive.com', 'himalayas.app'}
 
 
 class FetchError(Exception):

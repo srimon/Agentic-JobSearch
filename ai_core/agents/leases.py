@@ -82,7 +82,7 @@ def claim(worker_id):
                       (r.status='running' AND r.lease_expires_at<=clock_timestamp()
                        AND r.attempts<%s AND r.started_at<=clock_timestamp()-
                          (CASE s.provider WHEN 'remotive' THEN 21600
-                          WHEN 'jobicy' THEN 3600 ELSE 0 END * interval '1 second'))
+                          WHEN 'jobicy' THEN 3600 WHEN 'himalayas' THEN 21600 ELSE 0 END * interval '1 second'))
                     ORDER BY r.created_at LIMIT 100""",
                     (config.worker_max_attempts,)).fetchall()
                 run = None
@@ -97,7 +97,7 @@ def claim(worker_id):
                           (r.status='running' AND r.lease_expires_at<=clock_timestamp()
                            AND r.attempts<%s AND r.started_at<=clock_timestamp()-
                              (CASE s.provider WHEN 'remotive' THEN 21600
-                              WHEN 'jobicy' THEN 3600 ELSE 0 END * interval '1 second')))
+                              WHEN 'jobicy' THEN 3600 WHEN 'himalayas' THEN 21600 ELSE 0 END * interval '1 second')))
                         FOR UPDATE OF r SKIP LOCKED""",(candidate['id'],config.worker_max_attempts)).fetchone()
                     if candidate is None:
                         gate.execute('SELECT pg_advisory_unlock(hashtextextended(%s,0))',(provider,))
