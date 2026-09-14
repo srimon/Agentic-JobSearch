@@ -15,6 +15,53 @@ from src.api.intake import capital_one
 HEADERS={'Origin':'http://localhost:3105'}
 TEXT='Example Candidate\nexample@example.com\nExperience\nDirector Data Engineering. Led a team building SQL and Python pipelines on Azure.\nEducation\nExample degree.'
 
+def test_workflow_owner_isolation_and_cors(client):
+    from src.applications.daily import publish
+    publish(client.users[0]['id'],{'phase':'completed','counts':{'reviewed':2},'report_hash':'privatehash','job_ids':['privateid']})
+    r=client.get('/api/workflow',headers={'Origin':'http://localhost:3180'})
+    assert r.status_code==200 and r.headers['access-control-allow-origin']=='http://localhost:3180'
+    assert r.json()['latest']=={'phase':'completed','counts':{'reviewed':2}}
+    assert 'access-control-allow-origin' not in client.get('/api/workflow',headers={'Origin':'https://untrusted.example'}).headers
+    app.dependency_overrides[current_user]=lambda:client.users[1]
+    assert client.get('/api/workflow').json()['latest'] is None
+    app.dependency_overrides.clear()
+    assert client.get('/api/workflow').status_code==401
+
+def test_daily_preparation_reuses_and_obeys_archive(client):
+    from src.applications.daily import selected_jobs,prepare
+    uid=client.users[0]['id']
+    assert len(selected_jobs(uid)[0])==1
+    assert upload(client,'capital_one').status_code==200
+    counts,blockers=prepare(uid)
+    assert counts['reviewed']==1 and not blockers
+    with connection() as c:
+        original=c.execute('SELECT payload,updated_at FROM jobsearch.private_applications WHERE user_id=%s',(uid,)).fetchone()
+    prepare(uid)
+    with connection() as c:
+        assert c.execute('SELECT payload,updated_at FROM jobsearch.private_applications WHERE user_id=%s',(uid,)).fetchone()==original
+    assert client.put(f'/api/jobs/{client.jid}/dismissal',json={'reason':'not_relevant'},headers=HEADERS).status_code==200
+    assert selected_jobs(uid)[0]==[]
+
+def test_daily_unknown_and_saved_stage_never_selected(client):
+    from src.applications.daily import selected_jobs
+    from src.applications.private import private_connection
+    uid=client.users[0]['id']
+    with private_connection(uid) as c:
+        c.execute('INSERT INTO jobsearch.private_applications(user_id,job_id,payload) VALUES(%s,%s,%s)',
+          (uid,client.jid,encrypt(uid,'application:'+str(client.jid),{'status':'submission_unknown'})))
+    assert selected_jobs(uid)[0]==[]
+    with connection() as c:
+        c.execute('DELETE FROM jobsearch.private_applications WHERE user_id=%s',(uid,))
+        c.execute("INSERT INTO jobsearch.saved_jobs(user_id,job_id,stage) VALUES(%s,%s,'applied')",(uid,client.jid))
+    assert selected_jobs(uid)[0]==[]
+
+def test_daily_excluded_company_is_not_emailed(client):
+    from src.applications.daily import prepare
+    assert upload(client,'capital_one').status_code==200
+    assert client.put('/api/intake',json={'excluded_companies':'Capital One'},headers=HEADERS).status_code==200
+    counts,blockers=prepare(client.users[0]['id'])
+    assert counts['blocked']==1 and blockers==[]
+
 @pytest.fixture
 def client(tmp_path):
     assert os.environ.get('JOBSEARCH_AUTH_TEST')=='1'

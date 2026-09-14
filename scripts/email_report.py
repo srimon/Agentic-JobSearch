@@ -286,6 +286,12 @@ def track_report(body, rows, accepted=False):
         raise RuntimeError('Email history update failed. Check delivery journal before retrying; email may already have been accepted.' if accepted else 'Could not prepare email history; no email sent.')
 
 def send_tracked(body, rows, password, journal):
+    from src.applications.delivery_state import exclusive,require_known_deliveries
+    with exclusive(journal.parent,'report-dispatch.lock'):
+        require_known_deliveries(journal)
+        return _send_tracked(body,rows,password,journal)
+
+def _send_tracked(body, rows, password, journal):
     track_report(body, rows)
     try:
         message = deliver(body,password,journal)
@@ -306,6 +312,8 @@ def main():
     parser.add_argument('action', choices=['preview','send','configure'])
     parser.add_argument('--scheduled', action='store_true', help='Include current run summary and three-hour window for delivery deduplication.')
     args = parser.parse_args()
+    if args.scheduled and (state_directory()/'daily-owner.json').exists():
+        raise RuntimeError('Scheduled reporting is owned by the daily workflow; direct scheduled sends are disabled.')
     if args.action == 'configure':
         if not sys.stdin.isatty():
             raise RuntimeError('Run configure in your interactive WSL terminal.')

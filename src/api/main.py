@@ -57,6 +57,10 @@ async def boundaries(request,call_next):
         logging.getLogger('jobsearch.api').error('request_failed error_class=%s',type(exc).__name__)
         response=JSONResponse({'detail':'Service unavailable. Check the operational logs.'},status_code=503)
     response.headers['Cache-Control']='no-store'
+    if request.url.path=='/api/workflow' and request.headers.get('origin')=='http://localhost:3180':
+        response.headers['Access-Control-Allow-Origin']='http://localhost:3180'
+        response.headers['Access-Control-Allow-Credentials']='true'
+        response.headers['Vary']='Origin'
     response.headers['X-Content-Type-Options']='nosniff'
     response.headers['Referrer-Policy']='no-referrer'
     response.headers['X-Frame-Options']='SAMEORIGIN' if request.url.path.startswith(('/api/monitoring/','/api/data-model/report/')) else 'DENY'
@@ -336,3 +340,8 @@ app.include_router(analytics_router(operator))
 
 from src.api.hub_access import create_router as hub_access_router
 app.include_router(hub_access_router(operator))
+
+@app.get('/api/workflow')
+def daily_workflow_status(user=Depends(current_user)):
+    from src.applications.daily import status
+    return status(user['id'])
