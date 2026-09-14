@@ -2,6 +2,7 @@
 import re
 import time
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 from ai_core.tools.web_search import fetch_json
 from src.guardrails.content import plain_text, safe_link
 from src.pipelines.classification import posting_date, title_match
@@ -11,6 +12,26 @@ from src.pipelines.classification import posting_date, title_match
 class CollectionResult:
     jobs: list
     complete_board: bool
+
+
+def greenhouse_posting_url(board, job):
+    """Block's feed emits HTTP links although its careers site supports HTTPS.
+
+    Upgrade only the observed employer path and matching ID. All other URLs
+    still pass through the normal HTTPS-only validation; never follow redirects
+    or convert arbitrary source destinations.
+    """
+    value=job['absolute_url']
+    try:
+        parsed=urlsplit(value)
+        ident=str(job['id'])
+        if (board=='block' and ident.isdigit() and parsed.scheme=='http'
+                and parsed.netloc=='block.xyz' and parsed.path=='/careers/jobs/'+ident
+                and parsed.query in ('','gh_jid='+ident) and not parsed.fragment):
+            return parsed._replace(scheme='https').geturl()
+    except ValueError:
+        pass
+    return value
 
 
 def collect_snapshot(source, *, collector=None):
@@ -56,8 +77,9 @@ def collect(source):
                 detail=fetch_json(f'https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{j["id"]}')
                 posted=posting_date(detail.get('first_published'))
             rows.append(dict(source_job_id=str(j['id']),title=j['title'],location=j.get('location',{}).get('name',''),country='',
-                work_mode='Unknown',description=plain_text(j.get('content','')),url=j['absolute_url'],posted_at=posted,
-                evidence={'posting_date_field':'first_published','updated_at_is_not_posted_at':True}))
+                work_mode='Unknown',description=plain_text(j.get('content','')),url=greenhouse_posting_url(board,j),posted_at=posted,
+                evidence={'posting_date_field':'first_published','updated_at_is_not_posted_at':True,
+                          'https_upgrade':greenhouse_posting_url(board,j)!=j['absolute_url']}))
     elif provider=='lever':
         for offset in range(0,20000,100):
             page=fetch_json(f'https://api.lever.co/v0/postings/{board}?mode=json&skip={offset}&limit=100')
