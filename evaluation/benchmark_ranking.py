@@ -20,7 +20,9 @@ from src.applications.private import private_connection
 from src.db.store import connection
 
 
-def run(baseline):
+def run(baseline, dismissals=0):
+    if not 0 <= dismissals <= 300:
+        raise ValueError('Fixture dismissals must be between zero and 300')
     if os.environ.get('JOBSEARCH_AUTH_TEST')!='1':
         raise RuntimeError('Disposable database flag required')
     with connection() as c:
@@ -37,6 +39,9 @@ def run(baseline):
             FROM generate_series(1,1500) n""",(source,))
         c.execute("""INSERT INTO jobsearch.job_archives(user_id,identity,job_id,final_status)
             SELECT %s,url,id,'applied' FROM jobsearch.jobs WHERE source_job_id::int<=300""",(uid,))
+        c.execute("""INSERT INTO jobsearch.job_dismissals(user_id,identity,job_id,reason)
+            SELECT %s,url,id,'not_relevant' FROM jobsearch.jobs
+            WHERE source_job_id::int>300 AND source_job_id::int<=300+%s""",(uid,dismissals))
     previous=types.ModuleType('trusted_previous_learning')
     exec(compile((baseline/'learning.py').read_text(),str(baseline/'learning.py'),'exec'),previous.__dict__)
     tree=ast.parse((baseline/'main.py').read_text())
@@ -80,12 +85,12 @@ def run(baseline):
             elapsed=(time.perf_counter()-start)*1000
             ids=[str(r['id']) for r in response['items']]
             if expected is None:expected=ids
-            assert ids==expected and response['total']==1200
+            assert ids==expected and response['total']==1200-dismissals
             if iteration:samples[name].append(elapsed)
             result[name]={**metrics,'returned_rows':len(ids)}
     for name,values in samples.items():
         result[name].update(samples=len(values),median_ms=round(statistics.median(values),2),max_ms=round(max(values),2))
-    result['fixture']={'jobs':1500,'archived_decisions':300,'eligible':1200,'rank_order_equal':True}
+    result['fixture']={'jobs':1500,'archived_decisions':300,'dismissals':dismissals,'eligible':1200-dismissals,'rank_order_equal':True}
     print(json.dumps(result,sort_keys=True))
     return result
 
@@ -93,4 +98,6 @@ def run(baseline):
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('--baseline',type=Path,required=True)
-    run(parser.parse_args().baseline)
+    parser.add_argument('--dismissals',type=int,default=0)
+    args=parser.parse_args()
+    run(args.baseline,args.dismissals)
