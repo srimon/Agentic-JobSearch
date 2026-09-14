@@ -50,6 +50,7 @@ def run_one(worker_id=None):
                 if lost.is_set(): raise LeaseLost()
                 decisions=Counter()
                 seen=set()
+                excluded=[]
                 count=0
                 with connection() as conn:
                     require_lease(conn, run)
@@ -66,7 +67,12 @@ def run_one(worker_id=None):
                         elif bucket=='review':
                             bucket='guardrail_review' if job.get('reason','').startswith('Content quarantined') else ('unknown_location' if job.get('country_status')=='unknown' else 'title_review')
                         decisions[bucket]+=1
-                        if job['match_status']=='exclude': continue
+                        if job['match_status']=='exclude':
+                            # An observed exclusion must retire an older match, including
+                            # on bounded feeds. Never copy rejected source content, delete
+                            # the job, or change private application/owner decisions.
+                            excluded.append((key, job['reason']))
+                            continue
                         count+=1
                         job_id=uuid.uuid5(uuid.NAMESPACE_URL,f'{run["source_id"]}:{job["source_job_id"]}')
                         digest=hashlib.sha256(json.dumps(job,sort_keys=True,default=str).encode()).hexdigest()
@@ -74,6 +80,14 @@ def run_one(worker_id=None):
                         conn.execute('INSERT INTO jobsearch.jobs(id,source_id,'+','.join(fields)+',content_hash,evidence) VALUES('+','.join(['%s']*16)+") ON CONFLICT(source_id,source_job_id) DO UPDATE SET "+','.join(f'{x}=excluded.{x}' for x in fields[1:])+",content_hash=excluded.content_hash,evidence=excluded.evidence,last_seen_at=now(),availability='observed_open'",
                             [job_id,run['source_id']]+[job[x] for x in fields]+[digest,Jsonb(job['evidence'])])
                         conn.execute('INSERT INTO jobsearch.observations(job_id,run_id,content_hash,evidence) VALUES(%s,%s,%s,%s) ON CONFLICT DO NOTHING',(job_id,run['id'],digest,Jsonb(job['evidence'])))
+                    if excluded:
+                        # One update for the board, not one SQL round trip per
+                        # non-target posting. Only previously stored rows match.
+                        conn.execute("""UPDATE jobsearch.jobs AS j SET match_status='exclude',
+                            reason=rejected.reason,last_seen_at=now()
+                            FROM unnest(%s::text[],%s::text[]) AS rejected(source_job_id,reason)
+                            WHERE j.source_id=%s AND j.source_job_id=rejected.source_job_id""",
+                            ([key for key, _ in excluded], [reason for _, reason in excluded], run['source_id']))
                     reconcile_availability(conn, run, snapshot)
                     conn.execute("UPDATE jobsearch.runs SET status='completed',finished_at=now(),lease_token=NULL,lease_expires_at=NULL,fetched=%s,matched=%s WHERE id=%s",(len(jobs),count,run['id']))
                     conn.execute('UPDATE jobsearch.runs SET decision_counts=%s,trace_id=%s WHERE id=%s',(Jsonb(dict(decisions)),run_trace_id,run['id']))

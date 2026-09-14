@@ -75,3 +75,28 @@ def test_final_scope_data_and_approved_executives(title):
 @pytest.mark.parametrize('title',['Director AI','Sr. Director Artificial Intelligence','VP AI','SVP AI','Chief AI Officer','Chief Artificial Intelligence Officer','CAIO','Director Machine Learning','VP Generative AI'])
 def test_ai_leadership_matches(title):
     assert title_match(title)[1]=='match'
+
+
+@pytest.mark.parametrize('title',[
+    'Manager, CIO Advisory', 'CIO Advisory Manager', 'Chief of Staff to the CTO',
+    'Executive Assistant to the Chief Data Officer', 'Recruiter for CTO roles',
+    'Consultant, Chief Digital Officer Advisory', 'Director, Office of the CIO',
+    'Director of Sales reporting to Chief Data Officer', 'Manager, CDO Advisory',
+    'Analyst supporting Chief AI Officer', 'CIO Office Manager',
+])
+def test_referenced_executive_is_not_the_advertised_role(title):
+    assert title_match(title)[1] == 'exclude'
+
+
+@pytest.mark.parametrize('title,level',[
+    ('Director, Data Engineering reporting to CTO', 'Director'),
+    ('Sr. Director, AI - reports to Chief Information Officer', 'Senior Director'),
+    ('VP Data Management, Office of the CIO', 'VP'),
+    ('SVP, Chief Information Officer', 'C-suite'),
+    ('Founder & CTO', 'C-suite'),
+    ('Chief Data & AI Officer', 'C-suite'),
+    ('Chief Digital Officer (CDO)', 'C-suite'),
+])
+def test_held_leadership_role_is_preserved(title, level):
+    actual_level, status, _ = title_match(title)
+    assert (actual_level, status) == (level, 'match')

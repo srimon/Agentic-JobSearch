@@ -4,21 +4,58 @@ from datetime import datetime, timezone
 from src.guardrails.content import findings
 
 
+_EXECUTIVE = re.compile(
+    r'\b(?:chief (?:data|digital|information|technology|data and ai|data and analytics|ai|artificial intelligence) officer|cto|cio|cdo|caio)\b'
+)
+_OTHER_OCCUPATION = re.compile(
+    r'\b(?:manager|director|engineer|analyst|assistant|recruiter|consultant|advisor|adviser|specialist|coordinator|chief of staff|head of)\b'
+)
+
+
+def _held_title(title):
+    """Remove reporting context and executive titles referenced by another role.
+
+    This is a conservative title-only rule, not a claim about the description.
+    For example a Director of Data reporting to a CTO remains a Director.
+    """
+    t = re.sub(r'[^a-z0-9]+', ' ', title.lower().replace('&', ' and ')).strip()
+    t = re.split(
+        r'\b(?:reporting to|reports to|office of|supporting|support for|assistant to|advisor to|adviser to|recruiting for|recruiter for)\b',
+        t, maxsplit=1,
+    )[0].strip()
+    executive = False
+    ambiguous_cdo = False
+    references = []
+    for match in _EXECUTIVE.finditer(t):
+        prefix, suffix = t[:match.start()], t[match.end():]
+        referenced = bool(_OTHER_OCCUPATION.search(prefix)) or bool(re.match(
+            r'\s+(?:advisory|advisor|adviser|consulting|consultant|office|support|assistant|recruiter|recruitment|search|services|staff)\b', suffix
+        ))
+        if referenced:
+            references.append(match.span())
+        elif match.group() == 'cdo':
+            ambiguous_cdo = True
+        else:
+            executive = True
+    for start, end in reversed(references):
+        t = t[:start] + ' ' + t[end:]
+    return t, executive, ambiguous_cdo
+
+
 def title_match(title):
-    t = re.sub(r'[^a-z0-9]+',' ',title.lower()).strip()
+    t, executive, ambiguous_cdo = _held_title(title)
     level = 'Other'
-    if re.search(r'\b(chief|cto|cio|cdo|caio)\b',t): level='C-suite'
+    if executive or ambiguous_cdo: level='C-suite'
     elif re.search(r'\b(svp|senior vice president)\b',t): level='SVP'
     elif re.search(r'\b(vp|vice president)\b',t): level='VP'
     elif re.search(r'\b(senior|sr) director\b',t): level='Senior Director'
     elif re.search(r'\bdirector\b',t): level='Director'
-    executive=bool(re.search(r'\b(chief (data|digital|information|technology|data and ai|data and analytics|ai|artificial intelligence) officer|cto|cio|caio)\b',t))
     data_area=bool(re.search(r'\b(data|analytics|business intelligence|bi|information management|information governance)\b',t))
     ai_area=bool(re.search(r'\b(ai|artificial intelligence|machine learning|ml|generative ai|genai)\b',t))
     scientific_function=bool(re.search(r'\b(biologics|drug discovery|drug design|protein design|antibody|computational biology|bioinformatics|medicinal chemistry|molecular design)\b',t))
     if scientific_function and not (data_area or executive):
         return level,'exclude','Scientific discovery or therapeutic design role, outside data/AI leadership scope'
-    if re.search(r'\bcdo\b',t) and not executive:
+    if ambiguous_cdo and not executive:
         return level,'review','CDO requires evidence of Chief Data Officer or Chief Digital Officer'
     hit=executive or (level in ('Director','Senior Director','VP','SVP') and (data_area or ai_area))
     if not hit:
