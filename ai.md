@@ -1,3 +1,20 @@
+# Current architecture routing — September 14, 2026
+
+The canonical root is `/home/srimonadi/Enterprise-AI-Hub/apps/jobsearch`.
+Use `JBS/bin/python` here and the parent Hub's `AGENTS.md` and `ai.md` for
+current production operations. Jobsearch is deployed in enterprise-hub,
+uses shared infrastructure with scoped identities, local authentication,
+owner-bound intake, archive locks, daily discovery/reporting, ClickHouse
+analytics, and the separate Training & Preparation app at localhost:3188.
+The production endpoint is http://localhost:3105. Current recovery and
+retirement evidence is maintained in the parent Hub's docs/runbooks/.
+
+The dated notes below preserve design history. Statements about isolated
+Compose, pending cutover, staging-only functionality or the old home-directory
+roots are superseded by this current routing section and the Hub release records.
+
+---
+
 > Current production (2026-09-13): Jobsearch runs in enterprise-hub/jbs-production at http://localhost:3105 with one worker and scheduler. Old Compose application containers are stopped and fenced by .compose-retired. Do not run raw Compose up or reactivate them. Use the Hub runbook under /home/srimonadi/Enterprise-AI-Hub-consolidation/docs/runbooks/enterprise-ai-hub.md. Existing account.sh and email-report.sh route to the active runtime. Daily workflow: 08:00 America/Los_Angeles. MBK migration and old-infrastructure cleanup remain separate pending work.
 
 > 2026-09-13: The owner authorized full shared infrastructure consolidation and production cutover. Application code stays here; enterprise-hub is the new shared target. Follow the gated plan in /home/srimonadi/Enterprise-AI-Hub-consolidation/docs/plans/consolidation-execution.md. Earlier dedicated-service rules apply to the old deployment until its validated cutover.
