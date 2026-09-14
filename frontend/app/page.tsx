@@ -59,7 +59,7 @@ export default function Home(){
  const dataManagementEnabled=process.env.NEXT_PUBLIC_JOBSEARCH_ENVIRONMENT==='staging'||session?.features?.data_management===true;
  const user=session?.user, operator=!!user?.roles.some(r=>['operator','administrator'].includes(r)),member=!!user?.roles.some(r=>['member','administrator'].includes(r));
 
- useEffect(()=>{const params=new URLSearchParams(window.location.search);if(['workflow','matches','emailed','archive','saved','observability','quality','model','governance','runs','data-slack',...dataGroups.flatMap(g=>g.tools.map(t=>'data-'+t.id))].includes(params.get('view')||'')){setTab(params.get('view')!);setDate(params.get('view')==='archive'?'any':'24h');setShowDismissed(params.get('view')==='emailed')}},[]);
+ useEffect(()=>{const params=new URLSearchParams(window.location.search);if(['workflow','matches','emailed','archive','saved','sources','observability','quality','model','governance','runs','data-slack',...dataGroups.flatMap(g=>g.tools.map(t=>'data-'+t.id))].includes(params.get('view')||'')){setTab(params.get('view')!);setDate(params.get('view')==='archive'?'any':'24h');setShowDismissed(params.get('view')==='emailed')}},[]);
  useEffect(()=>{if(!user)return;const id=new URLSearchParams(window.location.search).get('job');if(id&&/^[0-9a-f-]{36}$/i.test(id))api<Job>('/jobs/'+id).then(j=>{if(j.archived_at)setNotice('This job is archived and locked.');else setDetail(j)}).catch(e=>setError(e.message));},[user]);
 
  useEffect(()=>{if(!user)return;const id=new URLSearchParams(window.location.search).get('archived');if(id&&/^[0-9a-f-]{36}$/i.test(id))api<Job>('/jobs/'+id).then(j=>{if(j.archived_at)setNotice('Status saved. The job is archived and permanently locked.')}).catch(e=>setError(e.message));},[user]);
