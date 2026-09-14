@@ -288,6 +288,38 @@ def test_archive_canonical_owner_scope(client):
         assert c.execute('SELECT * FROM jobsearch.job_archives').fetchall()==[]
         assert not c.execute("SELECT has_table_privilege('jobsearch_app','jobsearch.job_archives','UPDATE') AS allowed").fetchone()['allowed']
 
+
+@pytest.mark.parametrize('archived',[False,True])
+def test_list_canonical_keys_preserve_business_parameters_and_owner_locks(client, archived):
+    from src.applications.private import private_connection
+    from src.applications.email_history import record_report
+    uid=client.users[0]['id'];duplicate=uuid.uuid4();different=uuid.uuid4()
+    with private_connection(uid) as c:
+        c.execute("UPDATE jobsearch.jobs SET url='https://example.com/job?job_id=7&team=data&utm_source=one#intro' WHERE id=%s",(client.jid,))
+        for jid,key,url in [
+            (duplicate,'same-key','https://example.com/job?ref=mail&team=data&job_id=7&gh_src=test#details'),
+            (different,'different-key','https://example.com/job?team=data&job_id=8')]:
+            c.execute("INSERT INTO jobsearch.jobs(id,source_id,source_job_id,company,title,location,work_mode,country_status,level,match_status,reason,description,url,content_hash) SELECT %s,source_id,%s,company,title,location,work_mode,country_status,level,match_status,reason,description,%s,content_hash FROM jobsearch.jobs WHERE id=%s",(jid,key,url,client.jid))
+        if archived: record_report(c,uid,'e'*64,[client.jid,duplicate,different],accepted=True)
+    assert client.put(f'/api/jobs/{client.jid}/dismissal',json={'reason':'not_relevant'},headers=HEADERS).status_code==200
+    for sort in ('newest','recommended'):
+        data=client.get('/api/jobs?sort='+sort).json()
+        assert data['total']==1 and data['items'][0]['id']==str(different)
+        shown=client.get('/api/jobs?sort='+sort+'&show_dismissed=true').json()
+        assert shown['total']==(1 if archived else 3)
+    if archived:
+        assert client.get('/api/jobs?view=emailed&show_dismissed=true').json()['total']==1
+        assert client.get('/api/jobs?view=archive').json()['total']==2
+        assert client.put(f'/api/jobs/{duplicate}/dismissal',json={'dismissed':False},headers=HEADERS).status_code==409
+    else:
+        # A changed source URL cannot bypass a dismissal bound to this job ID.
+        with private_connection(uid) as c:
+            c.execute("UPDATE jobsearch.jobs SET url='https://example.com/changed' WHERE id=%s",(client.jid,))
+        assert client.get('/api/jobs').json()['total']==1
+    app.dependency_overrides[current_user]=lambda:client.users[1]
+    assert client.get('/api/jobs').json()['total']==3
+    assert client.get('/api/jobs?view=archive').json()['total']==0
+
 def test_learning_versions_controls_and_isolation(client):
     first=client.get('/api/learning').json()['model']
     assert first['enabled'] and first['rules']==[]

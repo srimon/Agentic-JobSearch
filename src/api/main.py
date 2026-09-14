@@ -121,7 +121,19 @@ def jobs(q:str=Query('',max_length=200),date:Literal['any','24h','7d','30d']='an
         values.append({'24h':24,'7d':168,'30d':720}[date])
     clauses.append('a.archived_at IS NOT NULL' if view=='archive' else 'a.archived_at IS NULL')
     if not show_dismissed and view!='archive': clauses.append('d.reason IS NULL')
-    base=' FROM jobsearch.jobs j LEFT JOIN jobsearch.saved_jobs s ON s.job_id=j.id AND s.user_id=%s LEFT JOIN LATERAL (SELECT reason FROM jobsearch.job_dismissals WHERE user_id=%s AND (job_id=j.id OR identity=jobsearch.posting_identity(j.url)) ORDER BY updated_at DESC LIMIT 1) d ON true LEFT JOIN LATERAL (SELECT max(emailed_at) AS last_emailed_at FROM jobsearch.emailed_jobs WHERE user_id=%s AND job_id=j.id) e ON true LEFT JOIN jobsearch.job_archives a ON a.user_id=%s AND a.identity=jobsearch.posting_identity(j.url) WHERE '+' AND '.join(clauses)
+    # OFFSET 0 keeps this scalar LATERAL result from being flattened back into
+    # each dismissal comparison. Reuse the existing canonicalization function;
+    # changing URL identity semantics would invalidate owner locks.
+    base=''' FROM jobsearch.jobs j
+        CROSS JOIN LATERAL (SELECT jobsearch.posting_identity(j.url) AS posting_key OFFSET 0) canonical
+        LEFT JOIN jobsearch.saved_jobs s ON s.job_id=j.id AND s.user_id=%s
+        LEFT JOIN LATERAL (SELECT reason FROM jobsearch.job_dismissals
+            WHERE user_id=%s AND (job_id=j.id OR identity=canonical.posting_key)
+            ORDER BY updated_at DESC LIMIT 1) d ON true
+        LEFT JOIN LATERAL (SELECT max(emailed_at) AS last_emailed_at FROM jobsearch.emailed_jobs
+            WHERE user_id=%s AND job_id=j.id) e ON true
+        LEFT JOIN jobsearch.job_archives a ON a.user_id=%s AND a.identity=canonical.posting_key
+        WHERE '''+' AND '.join(clauses)
     with private_connection(user['id']) as conn:
         model=learning_model(conn,user['id'])
         order='e.last_emailed_at DESC,j.id' if view=='emailed' else ('a.archived_at DESC,j.id' if view=='archive' else 'j.posted_at DESC NULLS LAST,j.id')
