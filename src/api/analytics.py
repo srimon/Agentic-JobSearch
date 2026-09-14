@@ -1,4 +1,4 @@
-"""Operator-only ClickHouse-derived staging snapshots; no database secrets."""
+"""Operator-only ClickHouse-derived snapshots; no database secrets."""
 from urllib.parse import urlsplit
 from fastapi import APIRouter,Depends,HTTPException
 from src.settings import settings

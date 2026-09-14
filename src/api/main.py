@@ -338,6 +338,9 @@ app.include_router(data_model_router(operator))
 from src.api.analytics import create_router as analytics_router
 app.include_router(analytics_router(operator))
 
+from src.api.governance import create_router as governance_router
+app.include_router(governance_router(operator))
+
 from src.api.hub_access import create_router as hub_access_router
 app.include_router(hub_access_router(operator))
 

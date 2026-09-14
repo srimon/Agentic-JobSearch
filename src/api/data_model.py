@@ -1,4 +1,4 @@
-"""Authenticated staging SchemaSpy snapshots; never exposes database credentials."""
+"""Authenticated SchemaSpy snapshots; never exposes database credentials."""
 import mimetypes
 from urllib.parse import urlsplit
 from fastapi import APIRouter, Depends, HTTPException
