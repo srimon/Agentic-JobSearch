@@ -408,8 +408,9 @@ def test_feedback_and_model_publish_are_atomic(client, monkeypatch):
     with private_connection(uid) as c: record_report(c,uid,'a'*64,[client.jid],accepted=True)
     def fail(_): raise RuntimeError('Simulated training failure')
     monkeypatch.setattr(learning,'train',fail)
-    with pytest.raises(RuntimeError,match='Simulated training failure'):
-        client.put(f'/api/jobs/{client.jid}/dismissal',json={'reason':'spam'},headers=HEADERS)
+    response=client.put(f'/api/jobs/{client.jid}/dismissal',json={'reason':'spam'},headers=HEADERS)
+    assert response.status_code==503
+    assert 'Simulated training failure' not in response.text
     with private_connection(uid) as c:
         for table in ('job_archives','job_dismissals','learning_versions'):
             assert c.execute('SELECT count(*) n FROM jobsearch.'+table+' WHERE user_id=%s',(uid,)).fetchone()['n']==0
