@@ -3,11 +3,11 @@ import {useEffect,useState,type FormEvent,type ReactNode} from 'react';
 import {ShieldCheck,MailCheck,KeyRound,CircleCheck,TriangleAlert} from 'lucide-react';
 import {api,ApiError,describeError,safeNext,rememberNext,recallNext,stripParams,type Session} from './session';
 
-type Mode='signin'|'signup'|'forgot'|'inbox'|'verify'|'reset';
+type Mode='signin'|'mfa'|'signup'|'forgot'|'inbox'|'verify'|'reset';
 type InboxKind='signup'|'reset'|'verify';
 const USERNAME_PATTERN='[a-z0-9][a-z0-9_.@+\\-]{2,127}';
 
-/** The signed-out card: sign in, create account, forgot password, inbox, and the email verification and password reset landings. */
+/** The signed-out card: sign in (with the optional two-step code), create account, forgot password, inbox, and the email verification and password reset landings. */
 export default function SignIn({session,onSession}:{session:Session|null;onSession:(s:Session)=>void}){
  const [mode,setMode]=useState<Mode>('signin');
  const [username,setUsername]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[email,setEmail]=useState(''),[displayName,setDisplayName]=useState('');
@@ -16,6 +16,7 @@ export default function SignIn({session,onSession}:{session:Session|null;onSessi
  const [verifyState,setVerifyState]=useState<'pending'|'ok'|'error'>('pending');
  const [resetToken,setResetToken]=useState(''),[resetState,setResetState]=useState<'form'|'done'|'invalid'>('form');
  const [next,setNext]=useState<string|null>(null);
+ const [code,setCode]=useState(''),[useRecovery,setUseRecovery]=useState(false);
  const signupEnabled=session?.signup_enabled===true;
 
  useEffect(()=>{
@@ -27,28 +28,50 @@ export default function SignIn({session,onSession}:{session:Session|null;onSessi
    stripParams('verify');setMode('verify');setVerifyState('pending');
    api('/auth/verify',{method:'POST',body:JSON.stringify({token:verifyToken})}).then(()=>setVerifyState('ok')).catch(e=>{setVerifyState('error');fail(e,{400:'This verification link is invalid or has expired.'})});
   }else if(token){stripParams('reset');setResetToken(token);setResetState('form');setMode('reset')}
+  else if(params.has('forgot')){stripParams('forgot');setMode('forgot')}
  },[]);
  useEffect(()=>{if(cooldown<=0)return;const timer=setTimeout(()=>setCooldown(c=>c-1),1000);return()=>clearTimeout(timer)},[cooldown]);
 
  function fail(e:unknown,map:Partial<Record<number,string>>={}){setError(describeError(e,map));if(e instanceof ApiError&&e.status===429)setCooldown(e.retryAfter||30)}
- function go(target:Mode){setMode(target);setError('');setNeedsVerification(false);setPassword('');setConfirm('')}
+ function go(target:Mode){setMode(target);setError('');setNeedsVerification(false);setPassword('');setConfirm('');setCode('');setUseRecovery(false)}
  const locked=busy||cooldown>0;
  const shownError=cooldown>0?`Too many attempts. Wait ${cooldown} second${cooldown===1?'':'s'} and try again.`:error;
 
+ async function finishSignIn(){
+  if(next){rememberNext(null);window.location.assign(next);return}
+  onSession(await api<Session>('/session'));
+ }
+
  async function signIn(e:FormEvent){e.preventDefault();setBusy(true);setError('');setNeedsVerification(false);
-  try{await api('/auth/login',{method:'POST',body:JSON.stringify({username,password})});setPassword('');
-   if(next){rememberNext(null);window.location.assign(next);return}
-   onSession(await api<Session>('/session'));
+  try{const result=await api<{ok?:boolean;mfa_required?:boolean}>('/auth/login',{method:'POST',body:JSON.stringify({username:username.trim(),password})});setPassword('');
+   // With two-step sign-in on, the password only opens a short challenge; the session comes after the code.
+   if(result?.mfa_required){setCode('');setUseRecovery(false);setMode('mfa');return}
+   await finishSignIn();
   }catch(err){setPassword('');
-   if(err instanceof ApiError&&err.status===401&&/verif/i.test(err.message)){setNeedsVerification(true);setError('Verify your email before signing in. Open the link we sent you, or request a new one.')}
-   else fail(err,{401:'Wrong username or password.',403:'This account cannot sign in here.'});
+   if(err instanceof ApiError&&(err.status===401||err.status===403)&&/verif/i.test(err.message)){setNeedsVerification(true);setError('Verify your email before signing in. Open the link we sent you, or request a new one.')}
+   else fail(err,{401:'Invalid username, email or password.',403:'This account cannot sign in here.'});
   }finally{setBusy(false)}}
+
+ async function verifyCode(value:string){
+  if(busy||cooldown>0)return;
+  setBusy(true);setError('');
+  try{await api('/auth/mfa/verify',{method:'POST',body:JSON.stringify(useRecovery?{recovery_code:value}:{code:value})});setCode('');await finishSignIn()}
+  catch(err){setCode('');
+   if(err instanceof ApiError&&err.status===400){go('signin');setError('Your sign-in attempt expired. Enter your password again.')}
+   else fail(err,{401:useRecovery?'That recovery code did not work. Check it and try again.':'That code did not work. Check your authenticator app and try again.'});
+  }finally{setBusy(false)}}
+
+ function codeChanged(value:string){
+  if(useRecovery){setCode(value.slice(0,32));return}
+  const digits=value.replace(/\D/g,'').slice(0,6);setCode(digits);
+  if(digits.length===6)verifyCode(digits);
+ }
 
  async function signUp(e:FormEvent){e.preventDefault();
   if(password.length<15){setError('Use a password of at least 15 characters.');return}
   setBusy(true);setError('');
   try{await api('/auth/signup',{method:'POST',body:JSON.stringify({username,email,password,display_name:displayName.trim()})});setPassword('');setInbox({kind:'signup',email,sent:false});setMode('inbox')}
-  catch(err){fail(err,{404:'Sign-up is closed on this site.',409:'That username or email is already taken.'})}
+  catch(err){fail(err,{404:'Sign-up is closed on this site.',409:'That username is taken. Choose another one.'})}
   finally{setBusy(false)}}
 
  async function requestReset(e:FormEvent){e.preventDefault();setBusy(true);setError('');
@@ -70,6 +93,7 @@ export default function SignIn({session,onSession}:{session:Session|null;onSessi
  function heading():{icon:ReactNode;eyebrow:string;title:ReactNode;text:string}{
   const shield=<ShieldCheck size={32}/>;
   switch(mode){
+   case 'mfa':return {icon:<KeyRound size={32}/>,eyebrow:'TWO-STEP SIGN-IN',title:<>Confirm it is you.</>,text:useRecovery?'Enter one of the recovery codes you saved when you turned on two-step sign-in. Each code works once.':'Enter the 6-digit code from your authenticator app.'};
    case 'signup':return {icon:shield,eyebrow:'CREATE YOUR ACCOUNT',title:<>Start your<br/>private search.</>,text:'One Bagala account signs you in to Job Search, the Library and Training. We will email you a link to verify your address.'};
    case 'forgot':return {icon:<KeyRound size={32}/>,eyebrow:'RESET YOUR PASSWORD',title:<>Forgot your<br/>password?</>,text:'Enter the email on your account and we will send you a link to choose a new password.'};
    case 'inbox':return {icon:<MailCheck size={32}/>,eyebrow:'CHECK YOUR INBOX',title:<>Check your inbox.</>,text:inbox.kind==='signup'?`We sent a verification link to ${inbox.email}. Open it to activate your account.`:inbox.kind==='reset'?`If ${inbox.email} belongs to an account, a reset link is on its way.`:'Your account still needs email verification. We can send the link again.'};
@@ -86,13 +110,23 @@ export default function SignIn({session,onSession}:{session:Session|null;onSessi
  return <div className="signin-card"><div className="lock-icon">{icon}</div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2><p>{text}</p>
 
   {mode==='signin'&&<form className="login-form" onSubmit={signIn}>
-   <label>Username<input autoComplete="username" required maxLength={128} value={username} onChange={e=>setUsername(e.target.value.toLowerCase())}/></label>
+   <label>Username or email<input autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={254} value={username} onChange={e=>setUsername(e.target.value.toLowerCase())}/></label>
    <label>Password<input type="password" autoComplete="current-password" required maxLength={128} value={password} onChange={e=>setPassword(e.target.value)}/></label>
    {errorLine}
    <button className="primary" disabled={locked}>{busy?'Signing in…':'Sign in'}</button>
    <div className="signin-links"><button type="button" className="link-button" onClick={()=>go('forgot')}>Forgot password?</button>{signupEnabled&&<button type="button" className="link-button" onClick={()=>go('signup')}>Create an account</button>}</div>
    {next&&<p className="hint">After signing in you will continue to {new URL(next).host}.</p>}
    <p className="hint">{signupEnabled?'One Bagala account signs you in to Job Search, the Library and Training.':'Sign-up is closed on this site. Accounts are created by your administrator.'}</p>
+  </form>}
+
+  {mode==='mfa'&&<form className="login-form" onSubmit={e=>{e.preventDefault();if(code)verifyCode(code)}}>
+   {useRecovery
+    ?<label>Recovery code<input key="recovery" autoComplete="off" autoCapitalize="none" spellCheck={false} required maxLength={32} placeholder="xxxxx-xxxxx" autoFocus value={code} onChange={e=>codeChanged(e.target.value)}/></label>
+    :<label>Authentication code<input key="totp" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" required maxLength={6} placeholder="123456" autoFocus value={code} onChange={e=>codeChanged(e.target.value)}/></label>}
+   {errorLine}
+   <button className="primary" disabled={locked||!code}>{busy?'Checking…':'Continue'}</button>
+   <div className="signin-links"><button type="button" className="link-button" onClick={()=>{setUseRecovery(r=>!r);setCode('');setError('')}}>{useRecovery?'Use your authenticator app instead':'Use a recovery code instead'}</button>{backToSignIn}</div>
+   <p className="hint">Lost your phone and your recovery codes? Contact your administrator to turn off two-step sign-in.</p>
   </form>}
 
   {mode==='signup'&&<form className="login-form" onSubmit={signUp}>

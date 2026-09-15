@@ -34,7 +34,7 @@ async def invalid_request(request, exc):
 
 @app.middleware('http')
 async def boundaries(request,call_next):
-    if cfg.maintenance_mode and request.method not in ('GET','HEAD','OPTIONS') and request.url.path not in ('/api/auth/login','/api/auth/logout') and not request.url.path.startswith('/api/monitoring/'):
+    if cfg.maintenance_mode and request.method not in ('GET','HEAD','OPTIONS') and request.url.path not in ('/api/auth/login','/api/auth/logout','/api/auth/mfa/verify') and not request.url.path.startswith('/api/monitoring/'):
         return JSONResponse({'detail':'Maintenance mode: changes are temporarily disabled.'},status_code=503,headers={'Retry-After':'300','Cache-Control':'no-store'})
     if request.method in ('POST','PUT','PATCH','DELETE'):
         if request.headers.get('origin') not in cfg.allowed_origins:
@@ -111,6 +111,8 @@ def logout(request:Request,user=Depends(current_user)):
 
 from src.auth.signup import create_router as signup_router
 app.include_router(signup_router(current_user))
+from src.auth.mfa import create_router as mfa_router
+app.include_router(mfa_router(current_user))
 
 
 @app.get('/api/hub/prep-identity')

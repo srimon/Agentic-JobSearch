@@ -63,3 +63,5 @@ main{margin-left:250px;width:calc(100% - 250px)}.topbar{height:76px;background:v
 .roles{display:inline-flex;gap:6px;flex-wrap:wrap}.roles span{font-size:12px;background:var(--surface-2);padding:3px 8px;border-radius:4px}.danger{border-color:var(--error-line);color:var(--error-ink)}
 .account .table-wrap{margin-bottom:16px}.account .empty{padding:28px}
 @media(max-width:700px){.account-facts{grid-template-columns:1fr}}
+.mfa-qr{display:block;background:#fff;padding:8px;border-radius:8px;border:1px solid var(--line);width:200px;height:200px;max-width:100%}.mfa-secret{font:600 14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--ink);letter-spacing:.5px;overflow-wrap:anywhere}
+.recovery-codes{list-style:none;padding:14px 18px;margin:0 0 18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 20px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace}@media(max-width:700px){.recovery-codes{grid-template-columns:1fr}}

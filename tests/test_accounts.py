@@ -76,15 +76,57 @@ def test_signup_creates_unverified_user_and_queues_mail(client):
     assert 'example.com' not in audit_text.lower() and token not in audit_text
     assert client.get('/api/session').json()['signup_enabled'] is True
 
-def test_duplicate_username_or_email_is_indistinguishable(client):
+def test_duplicate_email_mails_the_owner_and_taken_username_is_409(client):
     first=signup(client)
-    same_user=signup(client,username='NewUser',email='other@example.com')
-    same_email=signup(client,username='another',email='new.user@EXAMPLE.com')
-    assert (same_user.status_code,same_user.json())==(first.status_code,first.json())==(same_email.status_code,same_email.json())
+    same_email=signup(client,username='another',email='  new.user@EXAMPLE.com ')
+    assert (same_email.status_code,same_email.json())==(first.status_code,first.json())==(202,{'detail':'check your email'})
     with connection() as c:
         assert c.execute('SELECT count(*) n FROM jobsearch.users').fetchone()['n']==2
-    assert len(queued())==1
-    assert outcomes('account.signup')==['allowed','duplicate','duplicate']
+        assert not c.execute("SELECT 1 FROM jobsearch.users WHERE subject='another'").fetchone()
+    notices=queued('account_exists')
+    assert len(notices)==1 and notices[0]['to_address']=='New.User@example.com' and notices[0]['subject']=='You already have a Bagala account'
+    body=notices[0]['text_body']
+    assert 'newuser' in body and 'http://localhost:3105/' in body and 'http://localhost:3105/?forgot=1' in body and 'newuser' in notices[0]['html_body']
+    assert '?verify=' not in body and '?reset=' not in body and len(queued('verify'))==1
+    # Usernames are public: a taken one is named, and the reply is identical whether or not the email is also in use.
+    taken=signup(client,username='NewUser',email='other@example.com')
+    taken_both=signup(client,username='newuser',email='new.user@example.com')
+    assert (taken.status_code,taken.json())==(taken_both.status_code,taken_both.json())==(409,{'detail':'That username is taken'})
+    with connection() as c:
+        assert c.execute('SELECT count(*) n FROM jobsearch.users').fetchone()['n']==2
+    assert len(queued('account_exists'))==2
+    # Notices share the per-address mail budget (3 per 15 minutes) with resend and reset mail.
+    for name in ('third','fourth'):
+        assert signup(client,username=name,email='NEW.USER@example.com').status_code==202
+    assert len(queued('account_exists'))==3
+    with connection() as c:
+        details=[r['details'] for r in c.execute("SELECT details FROM jobsearch.audit_events WHERE action='account.signup' ORDER BY id").fetchall()]
+        audit_text=str(c.execute('SELECT * FROM jobsearch.audit_events').fetchall()).lower()
+    assert outcomes('account.signup')==['allowed','duplicate','username_taken','username_taken','duplicate','duplicate']
+    assert details[1]=={'email_in_use':True,'mail':'queued'} and details[2]=={'email_in_use':False,'mail':'none'} and details[-1]['mail']=='throttled'
+    assert 'example.com' not in audit_text
+    assert signup(client,username='fifth',email='new.user@example.com').status_code==429
+
+def test_login_accepts_username_or_email_with_one_budget(client):
+    signed_up_and_verified(client)
+    client.cookies.clear()
+    assert login(client,'  NEW.user@Example.COM ').status_code==200
+    client.cookies.clear()
+    wrong=login(client,'new.user@example.com','a wrong but long passphrase')
+    assert wrong.status_code==401 and wrong.json()=={'detail':'Invalid username, email or password'}
+    assert login(client,'nobody@example.com').json()=={'detail':'Invalid username, email or password'}
+    assert login(client,'newuser','a wrong but long passphrase').status_code==401
+    bucket='user:'+hashlib.sha256(b'newuser').hexdigest()
+    with connection() as c:
+        assert c.execute('SELECT attempts FROM jobsearch.login_limits WHERE bucket=%s',(bucket,)).fetchone()['attempts']==4
+    # Alternating the username and the email cannot double the per-account budget of 10.
+    for n in range(6):
+        assert login(client,'newuser' if n%2 else 'New.User@example.com','a wrong but long passphrase').status_code==401
+    assert login(client,'new.user@example.com').status_code==429 and login(client).status_code==429
+    # Older usernames that contain '@' still sign in when no account has that email address.
+    with connection() as c:
+        c.execute("INSERT INTO jobsearch.users(issuer,subject,display_name,roles,password_hash) VALUES('local','legacy@name.example','Legacy',ARRAY['member'],%s)",(password_hash(CONSOLE_PASSWORD),))
+    assert login(client,'Legacy@Name.example',CONSOLE_PASSWORD).status_code==200
 
 def test_signup_disabled_validation_and_throttle(client,monkeypatch):
     monkeypatch.setattr(settings(),'signup_enabled',False)
@@ -143,7 +185,7 @@ def test_reset_request_and_reset_revoke_sessions(client):
     known=client.post('/api/auth/reset-request',json={'email':'new.user@example.com'},headers=HEADERS)
     assert unknown.status_code==known.status_code==202 and unknown.json()==known.json()
     rows=queued('reset')
-    assert len(rows)==1 and '/?reset=' in rows[0]['text_body']
+    assert len(rows)==1 and '/?reset=' in rows[0]['text_body'] and 'Your username is newuser.' in rows[0]['text_body']
     token=token_from(rows[0],'reset')
     with connection() as c:
         assert c.execute("SELECT expires_at<=now()+interval '61 minutes' AS short FROM jobsearch.auth_tokens WHERE purpose='reset'").fetchone()['short']

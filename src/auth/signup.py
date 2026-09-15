@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field, SecretStr
 from src.settings import settings
 from src.db.store import connection, audit
 from src.auth.passwords import password_hash, verify, username, email_address
-from src.auth.local import throttled, token_hash, COOKIE
-from src.mail import queue_mail, render_verification, render_reset
+from src.auth.local import throttled, token_hash, mfa_enabled, COOKIE
+from src.mail import queue_mail, render_verification, render_reset, render_account_exists
 
 ACCEPTED = {'detail': 'check your email'}
 INVALID_TOKEN = 'invalid or expired token'
@@ -68,8 +68,11 @@ def consume_token(conn, raw, purpose):
 def send_verification(conn, user_id, email):
     queue_mail(conn, 'verify', email, *render_verification(settings().public_origin, issue_token(conn, user_id, 'verify')))
 
-def send_reset(conn, user_id, email):
-    queue_mail(conn, 'reset', email, *render_reset(settings().public_origin, issue_token(conn, user_id, 'reset')))
+def send_reset(conn, user_id, email, name=None):
+    queue_mail(conn, 'reset', email, *render_reset(settings().public_origin, issue_token(conn, user_id, 'reset'), name))
+
+def send_account_exists(conn, email, name):
+    queue_mail(conn, 'account_exists', email, *render_account_exists(settings().public_origin, name))
 
 def session_hash(request):
     return token_hash(request.cookies.get(COOKIE, ''))
@@ -87,12 +90,13 @@ def create_router(current_user):
         email = checked(email_address, body.email)
         encoded = checked(password_hash, body.password.get_secret_value())
         display = ' '.join(body.display_name.split()) or name
+        username_taken = False
         with connection() as conn:
             throttle = throttled(conn, [('signup', 30), (email_bucket('signup', email), 5)])
             if throttle:
                 audit(conn, 'anonymous', 'account.signup', 'local', 'throttled')
             else:
-                # ON CONFLICT covers the username key and the case-insensitive email index; duplicates get the same reply.
+                # The unique constraints decide: ON CONFLICT covers the username key and the case-insensitive email index.
                 row = conn.execute("""INSERT INTO jobsearch.users(issuer,subject,display_name,roles,active,password_hash,email)
                     VALUES('local',%s,%s,%s,true,%s,%s) ON CONFLICT DO NOTHING RETURNING id""",
                     (name, display, cfg.signup_default_roles, encoded, email)).fetchone()
@@ -100,9 +104,24 @@ def create_router(current_user):
                     send_verification(conn, row['id'], email)
                     audit(conn, str(row['id']), 'account.signup', 'local')
                 else:
-                    audit(conn, 'anonymous', 'account.signup', 'local', 'duplicate')
+                    # Nothing was inserted, so at least one key already existed; find out which after the fact.
+                    owner = conn.execute('SELECT id,subject,email,active FROM jobsearch.users WHERE lower(email)=lower(%s)', (email,)).fetchone()
+                    username_taken = conn.execute("SELECT 1 FROM jobsearch.users WHERE issuer='local' AND subject=%s", (name,)).fetchone() is not None
+                    mail = 'none'
+                    if owner and owner['active']:
+                        # The address owner hears about it (budget shared with resend and reset mail); the reply never says.
+                        if throttled(conn, [(email_bucket('mail', email), 3)]):
+                            mail = 'throttled'
+                        else:
+                            send_account_exists(conn, owner['email'], owner['subject'])
+                            mail = 'queued'
+                    audit(conn, 'anonymous', 'account.signup', 'local', 'username_taken' if username_taken else 'duplicate',
+                          details={'email_in_use': owner is not None, 'mail': mail})
         if throttle:
             raise RETRY_LATER
+        if username_taken:
+            # Usernames are public; this reply is the same whether or not the email is also in use.
+            raise HTTPException(409, 'That username is taken')
         return ACCEPTED
 
     @router.post('/verify')
@@ -125,7 +144,7 @@ def create_router(current_user):
             throttle = throttled(conn, [('mail', 60), (email_bucket('mail', email), 3)])
             outcome = 'throttled'
             if not throttle:
-                user = conn.execute("SELECT id,email,email_verified_at,active FROM jobsearch.users WHERE issuer='local' AND lower(email)=lower(%s) FOR UPDATE", (email,)).fetchone()
+                user = conn.execute("SELECT id,subject,email,email_verified_at,active FROM jobsearch.users WHERE issuer='local' AND lower(email)=lower(%s) FOR UPDATE", (email,)).fetchone()
                 outcome = 'queued' if user and user['active'] and wanted(user, conn) else 'ignored'
             audit(conn, 'anonymous', action, 'local', outcome)
         if throttle:
@@ -144,7 +163,7 @@ def create_router(current_user):
     @router.post('/reset-request', status_code=202)
     def reset_request(body: Email):
         def wanted(user, conn):
-            send_reset(conn, user['id'], user['email'])
+            send_reset(conn, user['id'], user['email'], user['subject'])
             return True
         return mail_request(body, 'account.reset_request', wanted)
 
@@ -166,9 +185,11 @@ def create_router(current_user):
 
     @router.get('/profile')
     def profile(user=Depends(current_user)):
+        with connection() as conn:
+            mfa = mfa_enabled(conn, user['id'])
         return {'username': user['subject'], 'display_name': user['display_name'], 'email': user.get('email'),
                 'email_verified': user.get('email_verified_at') is not None, 'roles': user['roles'],
-                'created_at': user.get('created_at'), 'last_login_at': user.get('last_login_at')}
+                'created_at': user.get('created_at'), 'last_login_at': user.get('last_login_at'), 'mfa_enabled': mfa}
 
     @router.patch('/profile')
     def update_profile(body: Profile, user=Depends(current_user)):

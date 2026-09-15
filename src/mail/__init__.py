@@ -34,10 +34,30 @@ def render_verification(public_origin, token):
     return 'Confirm your Bagala account', text, page
 
 
-def render_reset(public_origin, token):
+def render_reset(public_origin, token, username=None):
     link = public_origin.rstrip('/') + '/?reset=' + token
-    text, page = _message('Reset your Bagala password', ['Open the link below to choose a new password. All existing sessions are signed out when it is used.'], link, 'The link works once and expires in 1 hour.')
+    lines = ['Open the link below to choose a new password. All existing sessions are signed out when it is used.']
+    if username:
+        lines.append('Your username is ' + username + '. You can also sign in with this email address.')
+    text, page = _message('Reset your Bagala password', lines, link, 'The link works once and expires in 1 hour.')
     return 'Reset your Bagala password', text, page
+
+
+def render_account_exists(public_origin, username):
+    """Sent when someone signs up with an address that already has an account. Carries no token: both links lead to
+    the ordinary sign-in and password reset pages."""
+    origin = public_origin.rstrip('/')
+    title = 'You already have a Bagala account'
+    lines = ['Someone, probably you, just tried to create a new Bagala account with this email address. No new account was created.',
+             'Your existing username is ' + username + '. You can sign in with the username or with this email address.']
+    links = [('Sign in', origin + '/'), ('Forgot your password? Choose a new one', origin + '/?forgot=1')]
+    footer = 'If this was not you, you can ignore this message; your account has not changed.'
+    text = title + '\n\n' + '\n'.join(lines) + '\n\n' + '\n'.join(label + ': ' + url for label, url in links) + '\n\n' + footer + '\n'
+    page = ('<!doctype html><html><body style="font-family:sans-serif"><h2>' + html.escape(title) + '</h2>' +
+            ''.join('<p>' + html.escape(line) + '</p>' for line in lines) +
+            ''.join('<p><a href="' + html.escape(url, quote=True) + '">' + html.escape(label) + '</a></p>' for label, url in links) +
+            '<p>' + html.escape(footer) + '</p></body></html>')
+    return title, text, page
 
 
 def to_domain(address):
