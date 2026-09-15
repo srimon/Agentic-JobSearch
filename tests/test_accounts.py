@@ -245,7 +245,7 @@ def test_hub_origins_cors_session_links_and_library_origins(client,monkeypatch):
     def conn(): yield object()
     monkeypatch.setattr(hub_access,'connection',conn)
     monkeypatch.setattr(hub_access,'audit',lambda *a,**kw: records.append(kw))
-    app.dependency_overrides[current_user]=lambda:{'id':1,'roles':['operator'],'display_name':'T'}
+    app.dependency_overrides[current_user]=lambda:{'id':1,'roles':['administrator'],'display_name':'T'}
     try:
         r=client.get('/api/workflow',headers={'Origin':'https://hub.bagala.ai'})
         assert r.status_code==200 and r.headers['access-control-allow-origin']=='https://hub.bagala.ai' and r.headers['access-control-allow-credentials']=='true'

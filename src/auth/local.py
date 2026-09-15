@@ -36,6 +36,14 @@ def throttled(conn, buckets):
             return True
     return False
 
+def daily_count(conn, bucket, day):
+    """Count one use in a fixed UTC-day window and return the uses so far that day. throttled() keeps a 15-minute
+    window, so the day is part of the bucket name instead: each day starts a new row and nothing is ever reset.
+    prune() removes a row a day after its first use, which is always after its day has ended."""
+    return conn.execute("""INSERT INTO jobsearch.login_limits(bucket,attempts) VALUES(%s,1)
+      ON CONFLICT(bucket) DO UPDATE SET attempts=jobsearch.login_limits.attempts+1
+      RETURNING attempts""", (bucket + ':' + day.isoformat(),)).fetchone()['attempts']
+
 def login_buckets(identifier):
     """A global budget also bounds attacks using many usernames; the account budget is keyed by the matched account's
     username, so alternating username and email for one account shares a single budget."""

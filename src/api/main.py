@@ -79,14 +79,12 @@ def current_user(request:Request):
     return user
 
 
-def operator(user=Depends(current_user)):
-    # Retained only for the Library gateway authorization (/api/hub/library-authorize), which the hub owns.
-    if not set(user['roles']) & {'operator','administrator'}: raise HTTPException(403,'Operator role required')
-    return user
-
-
 def is_administrator(user):
     return 'administrator' in (user.get('roles') or ())
+
+
+# The per-job ranking explanation ("Why this ranking": learning version, rules, adjustment) is administrator-only.
+RANKING_EXPLANATION_FIELDS=('learning',)
 
 
 def administrator(user=Depends(current_user)):
@@ -188,7 +186,9 @@ def jobs(q:str=Query('',max_length=200),date:Literal['any','24h','7d','30d']='an
             order=score+' DESC,'+order
         total=conn.execute('SELECT count(*) AS n'+base,[user['id']]*4+values).fetchone()['n']
         rows=conn.execute('SELECT j.id,j.source_id,j.title,j.company,j.location,j.work_mode,j.country_status,j.level,j.match_status,j.reason,j.evidence,j.posted_at,j.first_seen_at,j.last_seen_at,j.url,(s.user_id IS NOT NULL) AS saved,s.stage,d.reason AS dismissal_reason,e.last_emailed_at,a.archived_at,a.final_status'+base+' ORDER BY '+order+' LIMIT 25 OFFSET %s',[user['id']]*4+values+ranking_params+[(page-1)*25]).fetchall()
-        for row in rows:row['learning']=learning_explain(row,model)
+        # "Why this ranking" (learning version, rules and adjustment) is administrator information; the order is the same for everyone.
+        if is_administrator(user):
+            for row in rows:row['learning']=learning_explain(row,model)
         summaries=application_summaries(conn,user['id'],[row['id'] for row in rows])
         for row in rows:
             row.update(summaries.get(str(row['id']),{'application_status':None,'next_action':None}))
@@ -211,6 +211,8 @@ def job_detail(job_id:uuid.UUID,user=Depends(current_user)):
             row['last_emailed_at']=conn.execute('SELECT max(emailed_at) AS at FROM jobsearch.emailed_jobs WHERE user_id=%s AND job_id=%s',(user['id'],job_id)).fetchone()['at']
     if not row: raise HTTPException(404,'Job not found')
     if row['match_status']!='match' and not row.get('last_emailed_at') and not is_administrator(user): raise HTTPException(403,'Administrator role required')
+    if not is_administrator(user):
+        for field in RANKING_EXPLANATION_FIELDS: row.pop(field,None)
     return row
 
 
@@ -384,8 +386,8 @@ from src.api.governance import create_router as governance_router
 app.include_router(governance_router(administrator))
 
 from src.api.hub_access import create_router as hub_access_router
-# Library gateway authorization is owned by the hub and still admits operators; see hub_access.py.
-app.include_router(hub_access_router(operator))
+# Library gateway authorization: the Reader for every verified account, everything else administrators; see hub_access.py.
+app.include_router(hub_access_router(current_user))
 
 @app.get('/api/workflow')
 def daily_workflow_status(user=Depends(current_user)):

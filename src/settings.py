@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     hub_origins: Annotated[list[str], NoDecode] = ['http://localhost:3180']
     # Origins the library gateway may forward for state-changing requests (/api/hub/library-authorize).
     library_origins: Annotated[list[str], NoDecode] = ['http://localhost:3001','http://localhost:3011','http://localhost:8000','http://localhost:8010']
+    # Reader questions a non-administrator may ask the Library per UTC day (/api/hub/library-authorize); 0 = unlimited.
+    reader_daily_question_limit: int = Field(default=50, ge=0)
     # JSON objects of links the front end shows: public when the request host is on cookie_domain, local otherwise.
     hub_links_local: dict[str, str] = {'hub':'http://localhost:3180/','library':'http://localhost:3001/reader','prep':'http://localhost:3188/'}
     hub_links_public: dict[str, str] = {'hub':'https://hub.bagala.ai/','library':'https://library.bagala.ai/reader','prep':'https://prep.bagala.ai/'}

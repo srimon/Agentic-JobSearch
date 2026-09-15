@@ -26,9 +26,12 @@ def test_library_gateway_auth_and_csrf(monkeypatch):
     try:
         with TestClient(app) as c:
             assert c.get('/api/hub/library-authorize').status_code==401
+            # Without a URI the path is unknown, which is administrator-only; operators no longer pass.
             app.dependency_overrides[current_user]=lambda:{'id':'test-id','roles':['member']}
             assert c.get('/api/hub/library-authorize').status_code==403
             app.dependency_overrides[current_user]=lambda:{'id':'test-id','roles':['operator']}
+            assert c.get('/api/hub/library-authorize').status_code==403
+            app.dependency_overrides[current_user]=lambda:{'id':'test-id','roles':['administrator']}
             assert c.get('/api/hub/library-authorize').status_code==204
             assert c.get('/api/hub/library-authorize',headers={'x-original-method':'POST'}).status_code==403
             assert c.get('/api/hub/library-authorize',headers={'x-original-method':'POST','x-original-origin':'https://evil.example'}).status_code==403

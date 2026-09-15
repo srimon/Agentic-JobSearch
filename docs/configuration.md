@@ -12,6 +12,7 @@ All settings are read by `src/settings.py` from the environment with the `JOBSEA
 | JOBSEARCH_ALLOWED_ORIGINS (new) | origin plus public_origin | Origins accepted by the CSRF check for POST/PUT/PATCH/DELETE (exact match on the `Origin` header). |
 | JOBSEARCH_HUB_ORIGINS (new) | http://localhost:3180 | Origins allowed to read `/api/workflow` with credentials (CORS special case). |
 | JOBSEARCH_LIBRARY_ORIGINS (new) | http://localhost:3001,http://localhost:3011,http://localhost:8000,http://localhost:8010 | Origins the library gateway may forward for state-changing requests to `/api/hub/library-authorize`. |
+| JOBSEARCH_READER_DAILY_QUESTION_LIMIT | 50 | Library Reader questions (`POST /api?op=ask`) a non-administrator may ask per UTC day, enforced by `/api/hub/library-authorize`; `0` = unlimited. Over the limit the Library gateway answers a JSON 429 with `Retry-After` until midnight UTC. |
 | JOBSEARCH_HUB_LINKS_LOCAL (new) | {"hub":"http://localhost:3180/","library":"http://localhost:3001/reader","prep":"http://localhost:3188/"} | Links returned by `/api/session` when the request host is not on the cookie domain. |
 | JOBSEARCH_HUB_LINKS_PUBLIC (new) | {"hub":"https://hub.bagala.ai/","library":"https://library.bagala.ai/reader","prep":"https://prep.bagala.ai/"} | Links returned by `/api/session` when the request host is the cookie domain or a subdomain of it. |
 | JOBSEARCH_COOKIE_DOMAIN (new) | (empty = host-only) | Session cookie `Domain`, applied only to requests whose host matches it; e.g. `bagala.ai`. |

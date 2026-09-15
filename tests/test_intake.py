@@ -381,8 +381,10 @@ def test_learning_management_is_administrator_only_but_ranking_is_not(client):
             assert client.put('/api/learning',json=body,headers=HEADERS).status_code==403
     app.dependency_overrides[current_user]=lambda:client.users[0]
     ranked=client.get('/api/jobs?sort=recommended').json()
-    assert ranked['total']==1 and ranked['items'][0]['learning']['version']==0
+    # Ranking applies to members; its explanation ("Why this ranking") is administrator-only.
+    assert ranked['total']==1 and 'learning' not in ranked['items'][0]
     admins=as_administrators(client)
+    assert client.get('/api/jobs?sort=recommended').json()['items'][0]['learning']['version']==0
     assert client.get('/api/learning').status_code==200
     assert client.put('/api/learning',json={'action':'pause'},headers=HEADERS).status_code==200
 
@@ -437,7 +439,12 @@ def test_recommended_ranking_before_pagination(client):
     assert str(client.jid) not in [j['id'] for j in newest['items']]
     assert ranked['items'][0]['id']==str(client.jid)
     assert newest['total']==ranked['total']==28
-    assert ranked['items'][0]['learning']['reasons']
+    assert all('learning' not in j for j in ranked['items'])
+    # The same account as an administrator: the same order, with the explanation.
+    app.dependency_overrides[current_user]=lambda:{**client.users[0],'roles':['administrator']}
+    explained=client.get('/api/jobs?sort=recommended').json()
+    assert [j['id'] for j in explained['items']]==[j['id'] for j in ranked['items']]
+    assert explained['items'][0]['learning']['reasons']
 
 
 def test_learning_reads_never_train_write_or_lock(client, monkeypatch):

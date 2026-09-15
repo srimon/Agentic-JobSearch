@@ -67,15 +67,43 @@ def test_operational_routes_allow_administrators(client):
     assert client.get('/api/workflow').json()['latest']['source_counts'] == {'completed': 4}
 
 
-def test_library_gateway_authorization_is_unchanged_for_operators(client, monkeypatch):
-    # /api/hub/library-authorize belongs to the hub's Library gateway and is intentionally left at operator level.
+def test_library_gateway_operations_are_administrator_only_and_the_reader_is_for_everyone(client, monkeypatch):
+    # /api/hub/library-authorize: the Library's monitoring and operations follow the same rule as Job Search's
+    # (tests/test_library_access.py covers the full path policy).
     from contextlib import contextmanager
     from src.api import hub_access
     @contextmanager
     def conn(): yield object()
     monkeypatch.setattr(hub_access, 'connection', conn)
     monkeypatch.setattr(hub_access, 'audit', lambda *a, **kw: None)
-    app.dependency_overrides[current_user] = lambda: {'id': 'x', 'roles': ['operator']}
-    assert client.get('/api/hub/library-authorize').status_code == 204
-    app.dependency_overrides[current_user] = lambda: {'id': 'x', 'roles': ['member']}
-    assert client.get('/api/hub/library-authorize').status_code == 403
+    for roles in (['viewer'], ['member'], ['operator']):
+        app.dependency_overrides[current_user] = lambda roles=roles: {'id': 'x', 'roles': roles}
+        assert client.get('/api/hub/library-authorize', headers={'x-original-uri': '/reader/operations'}).status_code == 403
+        assert client.get('/api/hub/library-authorize', headers={'x-original-uri': '/reader'}).status_code == 204
+    app.dependency_overrides[current_user] = lambda: {'id': 'x', 'roles': ['administrator']}
+    assert client.get('/api/hub/library-authorize', headers={'x-original-uri': '/reader/operations'}).status_code == 204
+
+
+def test_ranking_explanation_is_administrator_only(client):
+    import uuid
+    job = uuid.uuid4()
+    with connection() as c:
+        source = c.execute("INSERT INTO jobsearch.sources(company,provider,board) VALUES('Ranking Example','lever','ranking-example') ON CONFLICT(provider,board) DO UPDATE SET company=excluded.company RETURNING id").fetchone()['id']
+        c.execute("""INSERT INTO jobsearch.jobs(id,source_id,source_job_id,company,title,location,work_mode,country_status,level,match_status,reason,description,url,content_hash,posted_at)
+          VALUES(%s,%s,%s,'Ranking Example','Director Data Engineering','US','Remote','us_based','Director','match','test','d',%s,'h',now())""",
+                  (job, source, 'ranking-' + str(job), 'https://example.com/ranking/' + str(job)))
+    try:
+        for roles in (['viewer'], ['member'], ['operator']):
+            signed_in(roles)
+            for sort in ('newest', 'recommended'):
+                items = client.get('/api/jobs?sort=' + sort + '&q=Ranking%20Example').json()['items']
+                assert items and all('learning' not in item for item in items), (roles, sort)
+            detail = client.get('/api/jobs/' + str(job))
+            assert detail.status_code == 200 and 'learning' not in detail.json()
+        signed_in(['administrator'])
+        for sort in ('newest', 'recommended'):
+            items = client.get('/api/jobs?sort=' + sort + '&q=Ranking%20Example').json()['items']
+            assert items and all('version' in item['learning'] for item in items), sort
+    finally:
+        with connection() as c:
+            c.execute('DELETE FROM jobsearch.jobs WHERE id=%s', (job,))
