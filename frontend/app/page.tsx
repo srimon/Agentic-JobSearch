@@ -19,7 +19,7 @@ import SignIn from './SignIn';
 import Account from './Account';
 import Dialog from './Dialog';
 import {BrandHeader,BrandFooter} from './Brand';
-import {api,type Session,resolveLinks,prepStartUrl,isAdministrator,HubLinksContext,signOutToSignIn,describeError} from './session';
+import {api,type Session,resolveLinks,prepStartUrl,isAdministrator,HubLinksContext,signOutToSignIn,describeError,safeNext,rememberNext} from './session';
 
 import {CircleCheck,TriangleAlert,Clock3,LockKeyhole,Mail,Archive,Search,Bookmark,ArrowUpRight,MapPin,BriefcaseBusiness,ShieldCheck,Activity,Database,ChevronLeft,ChevronRight,RefreshCw,X,SlidersHorizontal,LogOut,UserRound,ArrowLeft} from 'lucide-react';
 
@@ -74,6 +74,11 @@ export default function Home(){
 
  useEffect(()=>{if(!user)return;const id=new URLSearchParams(window.location.search).get('archived');if(id&&/^[0-9a-f-]{36}$/i.test(id))api<Job>('/jobs/'+id).then(j=>{if(j.archived_at)setNotice('Status saved. The job is archived and permanently locked.')}).catch(e=>setError(e.message));},[user]);
  useEffect(()=>{api<Session>('/session').then(setSession).catch(e=>setError(e.message))},[]);
+ // Another product sent a signed-in visitor here to sign in (?next=...): go straight back instead of showing
+ // Opportunities. One bounce per address per minute, so a product that still refuses cannot loop.
+ useEffect(()=>{if(!session?.user)return;const params=new URLSearchParams(window.location.search);const next=safeNext(params.get('next'));if(!next||new URL(next).origin===window.location.origin)return;
+  const key='jobsearch-next-bounce:'+next;let recent=false;try{recent=Date.now()-Number(sessionStorage.getItem(key)||0)<60000;sessionStorage.setItem(key,String(Date.now()))}catch{}
+  rememberNext(null);if(!recent)window.location.replace(next);else window.history.replaceState(null,'',window.location.pathname)},[session]);
 
  useEffect(()=>{const timer=setTimeout(()=>{setQuery(q);setPage(1)},300);return()=>clearTimeout(timer)},[q]);
 

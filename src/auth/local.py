@@ -66,7 +66,12 @@ def find_account(conn, value):
     return conn.execute("SELECT id,subject FROM jobsearch.users WHERE issuer='local' AND subject=%s", (name,)).fetchone()
 
 def request_host(request):
-    host = request.headers.get('host', '').lower()
+    """The host the visitor used. Browser requests reach the API through the web app's /api rewrite, which proxies
+    with changeOrigin (Host becomes api:8100) and always sets X-Forwarded-Host to the incoming Host, overwriting any
+    client value; without it every session cookie was host-only on jobs.bagala.ai and the Library and Job Prep never
+    saw the sign-in (15 Sep 2026). Direct callers (gateways, tests) send no X-Forwarded-Host and keep Host."""
+    forwarded = request.headers.get('x-forwarded-host', '').split(',')[0].strip()
+    host = (forwarded or request.headers.get('host', '')).lower()
     return host[1:host.find(']')] if host.startswith('[') else host.split(':')[0]
 
 def on_cookie_domain(request):

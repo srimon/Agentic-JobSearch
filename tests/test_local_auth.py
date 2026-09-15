@@ -79,6 +79,24 @@ def test_login_records_last_login_and_prunes(client):
         assert 'stale' not in buckets and 'recent' in buckets and 'global' in buckets
         assert [r['token_hash'] for r in c.execute('SELECT token_hash FROM jobsearch.auth_tokens').fetchall()]==['live']
 
+def test_cookie_domain_uses_forwarded_host_from_the_web_rewrite(client, monkeypatch):
+    """Browsers reach the API through the web app's /api rewrite: Host becomes api:8100 and X-Forwarded-Host carries
+    the visitor's host. The shared Domain must follow X-Forwarded-Host, or the Library and Job Prep never see the
+    sign-in (the 15 Sep 2026 regression)."""
+    from src.settings import settings
+    monkeypatch.setattr(settings(),'cookie_domain','bagala.ai')
+    monkeypatch.setattr(settings(),'secure_cookies',True)
+    monkeypatch.setattr(settings(),'allowed_origins',['http://localhost:3105','https://jobs.bagala.ai'])
+    body={'username':'tester','password':'a long test passphrase'}
+    rewritten={'Origin':'https://jobs.bagala.ai','Host':'api:8100','X-Forwarded-Host':'jobs.bagala.ai','X-Forwarded-Proto':'https'}
+    r=client.post('/api/auth/login',json=body,headers=rewritten)
+    assert r.status_code==200 and 'Domain=bagala.ai' in r.headers['set-cookie'] and 'Secure' in r.headers['set-cookie']
+    session=client.get('/api/session',headers={'Host':'api:8100','X-Forwarded-Host':'library.bagala.ai'}).json()
+    assert session['links']['library'].startswith('https://library.bagala.ai')
+    local=client.get('/api/session',headers={'Host':'api:8100','X-Forwarded-Host':'localhost:3105'}).json()
+    assert local['links']['hub'].startswith('http://localhost')
+
+
 def test_cookie_attributes_follow_request_host(client, monkeypatch):
     from src.settings import settings
     monkeypatch.setattr(settings(),'cookie_domain','bagala.ai')
