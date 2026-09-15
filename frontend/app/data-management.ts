@@ -6,7 +6,7 @@ export const dataGroups = [
         "id": "clickhouse",
         "name": "ClickHouse",
         "description": "Explore reconciled production public-listing snapshots and the authenticated read-only SQL console. Daily load at 08:30 Pacific.",
-        "url": "http://localhost:3105/?view=data-clickhouse",
+        "url": "/?view=data-clickhouse",
         "status": "Production analytics"
       }
     ]
@@ -17,15 +17,15 @@ export const dataGroups = [
       {
         "id": "gx",
         "name": "Great Expectations",
-        "description": "Review validation results for Jobsearch.",
-        "url": "http://localhost:3105/?view=data-gx",
+        "description": "Review validation results for Job Search.",
+        "url": "/?view=data-gx",
         "status": "Validation results"
       },
       {
         "id": "soda",
         "name": "SODA",
         "description": "Review scans and measured data-quality findings.",
-        "url": "http://localhost:3105/?view=data-soda",
+        "url": "/?view=data-soda",
         "status": "Validation results"
       }
     ]
@@ -37,14 +37,14 @@ export const dataGroups = [
         "id": "model",
         "name": "PostgreSQL · SchemaSpy",
         "description": "Explore production tables and declared relationships using an empty schema copy.",
-        "url": "http://localhost:3105/?view=model",
+        "url": "/?view=model",
         "status": "Production schema viewer"
       },
       {
         "id": "catalog",
         "name": "OpenMetadata · Catalog",
         "description": "Explore production PostgreSQL and ClickHouse metadata.",
-        "url": "http://localhost:3105/?view=data-catalog",
+        "url": "/?view=data-catalog",
         "status": "Production catalog"
       }
     ]
@@ -56,7 +56,7 @@ export const dataGroups = [
         "id": "governance",
         "name": "OpenMetadata",
         "description": "Review business definitions, suggested classifications and stewardship assignments.",
-        "url": "http://localhost:3105/?view=data-governance",
+        "url": "/?view=data-governance",
         "status": "Catalog and governance"
       }
     ]
@@ -68,7 +68,7 @@ export const dataGroups = [
         "id": "lineage",
         "name": "OpenMetadata · Lineage",
         "description": "Follow declared dependencies from PostgreSQL to current ClickHouse listings and ML features.",
-        "url": "http://localhost:3105/?view=data-lineage",
+        "url": "/?view=data-lineage",
         "status": "Verified pipeline lineage"
       }
     ]
@@ -80,7 +80,7 @@ export const dataGroups = [
         "id": "science",
         "name": "ML feature dataset",
         "description": "Inspect reproducible public-listing features. No notebook workspace or model training is configured.",
-        "url": "http://localhost:3105/?view=data-science",
+        "url": "/?view=data-science",
         "status": "Feature dataset available"
       }
     ]
@@ -92,14 +92,14 @@ export const dataGroups = [
         "id": "ingestion",
         "name": "ClickHouse ingestion",
         "description": "Reconciled daily snapshot from production PostgreSQL at 08:30 Pacific after source collection.",
-        "url": "http://localhost:3105/?view=data-ingestion",
+        "url": "/?view=data-ingestion",
         "status": "Scheduled Kubernetes Job"
       },
       {
         "id": "dbt",
         "name": "dbt Core",
         "description": "Review dbt validation evidence; ClickHouse transformations use versioned SQL views.",
-        "url": "http://localhost:3105/?view=data-dbt",
+        "url": "/?view=data-dbt",
         "status": "Validation results"
       },
       {
