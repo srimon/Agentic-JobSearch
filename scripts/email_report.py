@@ -17,8 +17,10 @@ import tempfile
 import uuid
 from datetime import datetime, timezone
 from email.message import EmailMessage
+from src.settings import settings
 
-ADDRESS = 'sean.chopparapu@gmail.com'
+# Sender and sole recipient; JOBSEARCH_REPORT_RECIPIENT overrides the historical default.
+ADDRESS = settings().report_recipient
 ROOT = Path(__file__).resolve().parents[1]
 EXPORT = r'''
 import json

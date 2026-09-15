@@ -19,7 +19,7 @@ def require_app_role():
 def export_rows():
     require_app_role()
     with connection() as c:
-     u=c.execute("SELECT id FROM jobsearch.users WHERE issuer='local' AND subject='admin' AND active").fetchone()
+     u=c.execute("SELECT id FROM jobsearch.users WHERE issuer='local' AND subject=%s AND active",(settings().owner_username,)).fetchone()
      if not u: raise RuntimeError('Active owner missing')
     with private_connection(u['id']) as c:
      model=current(c,u['id'])
@@ -49,7 +49,7 @@ def record_report_data(data):
     if not re.fullmatch('[0-9a-f]{64}',data['report_hash']): raise ValueError('Invalid report identity')
     ids=[str(uuid.UUID(x)) for x in data['job_ids']]
     with connection() as c:
-     u=c.execute("SELECT id FROM jobsearch.users WHERE issuer='local' AND subject='admin' AND active").fetchone()
+     u=c.execute("SELECT id FROM jobsearch.users WHERE issuer='local' AND subject=%s AND active",(settings().owner_username,)).fetchone()
     if not u: raise RuntimeError('Active owner missing')
     with private_connection(u['id']) as c:
      record_report(c,u['id'],data['report_hash'],ids,accepted=data['accepted'])

@@ -29,7 +29,7 @@ def next_run(now):
 def owner_id():
     require_app_role()
     with connection() as c:
-        row=c.execute("SELECT id FROM jobsearch.users WHERE issuer='local' AND subject='admin' AND active AND 'administrator'=ANY(roles)").fetchone()
+        row=c.execute("SELECT id FROM jobsearch.users WHERE issuer='local' AND subject=%s AND active AND 'administrator'=ANY(roles)",(settings().owner_username,)).fetchone()
     if not row:raise RuntimeError('Active report owner unavailable')
     return row['id']
 

@@ -6,7 +6,7 @@ A private React/Next.js application for discovering US data and AI leadership op
 
 ## Implemented
 
-- FastAPI backend and React/Next.js frontend, with local account authentication.
+- FastAPI backend and React/Next.js frontend, with local account authentication: console-created accounts plus optional self-service sign-up with email verification, password reset, profile and session management (ADR 0004; off unless `JOBSEARCH_SIGNUP_ENABLED=true`). Every `JOBSEARCH_*` setting is listed in [configuration](docs/configuration.md).
 - Isolated PostgreSQL, Qdrant and Redis services; a deterministic source collector and durable refresh queue.
 - Supported public ATS feeds, Dice, Jobicy and Remotive adapters. Coverage is bounded, not the entire internet.
 - Past-24-hours default on active listing screens, with wider date filters available.
@@ -34,7 +34,7 @@ npm ci
 cd ..
 ```
 
-Read [deployment](docs/deployment.md), [isolated stack decision](docs/decisions/0002-isolated-stack.md), [local authentication](docs/playbooks/local-authentication.md) and [operations](docs/playbooks/operations.md) before starting a new installation. Runtime credentials, secret configuration files and database migrations must be provisioned for the new environment; they are intentionally not committed. Some lifecycle paths target the original WSL host and must be reviewed for a different installation.
+Read [deployment](docs/deployment.md), [isolated stack decision](docs/decisions/0002-isolated-stack.md), [local authentication](docs/playbooks/local-authentication.md), [configuration](docs/configuration.md) and [operations](docs/playbooks/operations.md) before starting a new installation. Account mail (verification and reset links) is delivered by a single `python -m scripts.mailer` replica; without it sign-ups stay unverified. Runtime credentials, secret configuration files and database migrations must be provisioned for the new environment; they are intentionally not committed. Some lifecycle paths target the original WSL host and must be reviewed for a different installation.
 
 For an already configured local deployment:
 

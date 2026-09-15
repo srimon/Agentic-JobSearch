@@ -11,6 +11,14 @@ def username(value):
         raise ValueError("Use 3-128 letters, digits or _.@+- for the username")
     return value
 
+def email_address(value):
+    """Shape check only; the domain is lower-cased and uniqueness is case-insensitive in the database."""
+    value = value.strip()
+    if not 6 <= len(value) <= 254 or not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", value):
+        raise ValueError("Enter a valid email address")
+    local, domain = value.rsplit('@', 1)
+    return local + '@' + domain.lower()
+
 def password_hash(value):
     if not 15 <= len(value) <= 128:
         raise ValueError("Password must contain 15-128 characters")

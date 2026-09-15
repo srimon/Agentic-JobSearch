@@ -18,7 +18,7 @@ from src.applications.learning import current as learning_model,explain as learn
 
 cfg=settings()
 app=FastAPI(title='Jobsearch',docs_url=None,redoc_url=None)
-from src.auth.local import router as local_auth
+from src.auth.local import router as local_auth, cookie_options, on_cookie_domain
 app.include_router(local_auth)
 from src.observability import setup,event,HTTP,LATENCY
 from opentelemetry import trace
@@ -37,7 +37,7 @@ async def boundaries(request,call_next):
     if cfg.maintenance_mode and request.method not in ('GET','HEAD','OPTIONS') and request.url.path not in ('/api/auth/login','/api/auth/logout') and not request.url.path.startswith('/api/monitoring/'):
         return JSONResponse({'detail':'Maintenance mode: changes are temporarily disabled.'},status_code=503,headers={'Retry-After':'300','Cache-Control':'no-store'})
     if request.method in ('POST','PUT','PATCH','DELETE'):
-        if request.headers.get('origin')!=cfg.origin:
+        if request.headers.get('origin') not in cfg.allowed_origins:
             return JSONResponse({'detail':'Origin rejected'},status_code=403)
     limit=5*1024*1024 if request.method=='PUT' and request.url.path in ('/api/intake/resume/default','/api/intake/resume/capital_one') else 65536
     if request.headers.get('content-length','').isdigit() and int(request.headers['content-length'])>limit:
@@ -57,8 +57,9 @@ async def boundaries(request,call_next):
         logging.getLogger('jobsearch.api').error('request_failed error_class=%s',type(exc).__name__)
         response=JSONResponse({'detail':'Service unavailable. Check the operational logs.'},status_code=503)
     response.headers['Cache-Control']='no-store'
-    if request.url.path=='/api/workflow' and request.headers.get('origin')=='http://localhost:3180':
-        response.headers['Access-Control-Allow-Origin']='http://localhost:3180'
+    origin=request.headers.get('origin','')
+    if request.url.path=='/api/workflow' and origin and origin in cfg.hub_origins:
+        response.headers['Access-Control-Allow-Origin']=origin
         response.headers['Access-Control-Allow-Credentials']='true'
         response.headers['Vary']='Origin'
     response.headers['X-Content-Type-Options']='nosniff'
@@ -94,8 +95,10 @@ def health():
 def session(request:Request):
     try: user=current_user(request)
     except HTTPException: user=None
+    # Links follow the request host so the front end never hard-codes localhost or the public edge.
     return {'user': {'name':user['display_name'],'roles':user['roles']} if user else None,
-            'identity_ready':True,'provider':'Local','features':{'data_management':cfg.data_management_enabled,'maintenance':cfg.maintenance_mode}}
+            'identity_ready':True,'provider':'Local','features':{'data_management':cfg.data_management_enabled,'maintenance':cfg.maintenance_mode},
+            'links':cfg.hub_links_public if on_cookie_domain(request) else cfg.hub_links_local,'signup_enabled':cfg.signup_enabled}
 
 
 @app.post('/api/auth/logout')
@@ -103,7 +106,11 @@ def logout(request:Request,user=Depends(current_user)):
     with connection() as conn:
         conn.execute('DELETE FROM jobsearch.sessions WHERE token_hash=%s',(hashlib.sha256(request.cookies['jobsearch_session'].encode()).hexdigest(),))
         audit(conn,str(user['id']),'logout','session')
-    response=JSONResponse({'ok':True}); response.delete_cookie('jobsearch_session'); return response
+    # The deletion must carry the same Domain/Secure/SameSite decision as the sign-in cookie or browsers keep the old one.
+    response=JSONResponse({'ok':True}); response.delete_cookie('jobsearch_session',**cookie_options(request)); return response
+
+from src.auth.signup import create_router as signup_router
+app.include_router(signup_router(current_user))
 
 
 @app.get('/api/hub/prep-identity')
