@@ -8,6 +8,9 @@ from pathlib import Path
 from src.settings import settings
 
 RESEND_URL = 'https://api.resend.com/emails'
+# Resend's edge refuses urllib's default "Python-urllib/x.y" agent with Cloudflare error 1010 (HTTP 403),
+# measured 15 Sep 2026; every request names this client instead.
+USER_AGENT = 'bagala-mailer/1.0 (+https://www.bagala.ai)'
 MAX_ATTEMPTS = 5
 
 
@@ -51,6 +54,7 @@ def send_resend(row, cfg):
         payload['html'] = row['html_body']
     request = urllib.request.Request(RESEND_URL, data=json.dumps(payload).encode(), method='POST', headers={
         'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Accept': 'application/json',
+        'User-Agent': USER_AGENT,
         'Idempotency-Key': 'jobsearch-outbound-mail/' + str(row['id'])})
     with urllib.request.urlopen(request, timeout=20) as response:
         try:
