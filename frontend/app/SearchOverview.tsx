@@ -6,12 +6,12 @@ export default function SearchOverview({view}:{view:string}){
   {Icon:ClipboardCheck,title:'Take the next step',text:'Use the action notes on each job.',tone:'teal'},
   {Icon:Archive,title:'Update & archive',text:'A final status locks the emailed listing.',tone:'amber'}
  ]:[
-  {Icon:Radar,title:'Discover',text:'Supported sources, checked on schedule.',tone:'blue'},
+  {Icon:Radar,title:'Discover',text:'New opportunities from trusted employers.',tone:'blue'},
   {Icon:ClipboardCheck,title:'Review',text:'Compare the role with your experience.',tone:'teal'},
   {Icon:SlidersHorizontal,title:'Refine',text:'Your feedback improves future rankings.',tone:'amber'}
  ];
  return <section className={'search-overview '+(emailed?'overview-compact':'')} aria-label={emailed?'How to work through emailed jobs':'How your job search works'}>
- {!emailed&&<div className="overview-intro"><div><span className="overview-kicker"><span/>YOUR SEARCH, WITH DIRECTION</span><h2>Find the next place<br/>to make an impact.</h2><p>Explore leadership opportunities in data and AI.<br/>Build a more focused shortlist with every decision.</p><span className="private-note"><LockKeyhole size={13}/>Your profile. Your decisions.</span></div>
+ {!emailed&&<div className="overview-intro"><div><span className="overview-kicker"><span/>YOUR SEARCH, WITH DIRECTION</span><h2>Find the next place<br/>to make an impact.</h2><p>Explore opportunities that fit your experience.<br/>Build a more focused shortlist with every decision.</p><span className="private-note"><LockKeyhole size={13}/>Your profile. Your decisions.</span></div>
  <svg className="career-illustration" viewBox="0 0 400 180" role="img" aria-label="Illustration of job listings connecting to a focused shortlist and feedback loop">
  <defs><linearGradient id="cardGlow" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#e0f2fe"/><stop offset="1" stopColor="#ccfbf1"/></linearGradient></defs>
  <ellipse cx="211" cy="95" rx="156" ry="72" fill="url(#cardGlow)" opacity=".6"/>

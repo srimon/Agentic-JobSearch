@@ -94,12 +94,12 @@ export default function SignIn({session,onSession}:{session:Session|null;onSessi
   const shield=<ShieldCheck size={32}/>;
   switch(mode){
    case 'mfa':return {icon:<KeyRound size={32}/>,eyebrow:'TWO-STEP SIGN-IN',title:<>Confirm it is you.</>,text:useRecovery?'Enter one of the recovery codes you saved when you turned on two-step sign-in. Each code works once.':'Enter the 6-digit code from your authenticator app.'};
-   case 'signup':return {icon:shield,eyebrow:'CREATE YOUR ACCOUNT',title:<>Start your<br/>private search.</>,text:'One Bagala account signs you in to Job Search, the Library and Training. We will email you a link to verify your address.'};
+   case 'signup':return {icon:shield,eyebrow:'CREATE YOUR ACCOUNT',title:<>Start your<br/>private search.</>,text:'One Bagala account signs you in to Job Search, Job Prep and Library. We will email you a link to verify your address.'};
    case 'forgot':return {icon:<KeyRound size={32}/>,eyebrow:'RESET YOUR PASSWORD',title:<>Forgot your<br/>password?</>,text:'Enter the email on your account and we will send you a link to choose a new password.'};
    case 'inbox':return {icon:<MailCheck size={32}/>,eyebrow:'CHECK YOUR INBOX',title:<>Check your inbox.</>,text:inbox.kind==='signup'?`We sent a verification link to ${inbox.email}. Open it to activate your account.`:inbox.kind==='reset'?`If ${inbox.email} belongs to an account, a reset link is on its way.`:'Your account still needs email verification. We can send the link again.'};
    case 'verify':return verifyState==='ok'?{icon:<CircleCheck size={32}/>,eyebrow:'EMAIL VERIFIED',title:<>You are all set.</>,text:'Your email is verified. Sign in to start your search.'}:verifyState==='error'?{icon:<TriangleAlert size={32}/>,eyebrow:'LINK NOT ACCEPTED',title:<>That link did not work.</>,text:'Enter your email and we will send a fresh verification link.'}:{icon:shield,eyebrow:'VERIFYING',title:<>One moment.</>,text:'Confirming your email address.'};
    case 'reset':return resetState==='done'?{icon:<CircleCheck size={32}/>,eyebrow:'PASSWORD UPDATED',title:<>You are all set.</>,text:'Your password has been changed.'}:resetState==='invalid'?{icon:<TriangleAlert size={32}/>,eyebrow:'LINK NOT ACCEPTED',title:<>That link did not work.</>,text:'Reset links expire after a short while. Request a new one below.'}:{icon:<KeyRound size={32}/>,eyebrow:'CHOOSE A NEW PASSWORD',title:<>Set a new password.</>,text:'Pick something long and memorable: at least 15 characters.'};
-   default:return {icon:shield,eyebrow:'A PRIVATE SEARCH',title:<>Your next opportunity<br/>starts here.</>,text:'Sign in with your Bagala account to browse leadership roles, save opportunities, and follow your search.'};
+   default:return {icon:shield,eyebrow:'A PRIVATE SEARCH',title:<>Your next opportunity<br/>starts here.</>,text:'Sign in with your Bagala account to find and track opportunities.'};
   }
  }
  const {icon,eyebrow,title,text}=heading();
@@ -116,7 +116,7 @@ export default function SignIn({session,onSession}:{session:Session|null;onSessi
    <button className="primary" disabled={locked}>{busy?'Signing in…':'Sign in'}</button>
    <div className="signin-links"><button type="button" className="link-button" onClick={()=>go('forgot')}>Forgot password?</button>{signupEnabled&&<button type="button" className="link-button" onClick={()=>go('signup')}>Create an account</button>}</div>
    {next&&<p className="hint">After signing in you will continue to {new URL(next).host}.</p>}
-   <p className="hint">{signupEnabled?'One Bagala account signs you in to Job Search, the Library and Training.':'Sign-up is closed on this site. Accounts are created by your administrator.'}</p>
+   <p className="hint">{signupEnabled?'One Bagala account signs you in to Job Search, Job Prep and Library.':'Sign-up is closed on this site. Accounts are created by your administrator.'}</p>
   </form>}
 
   {mode==='mfa'&&<form className="login-form" onSubmit={e=>{e.preventDefault();if(code)verifyCode(code)}}>

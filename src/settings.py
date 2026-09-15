@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     mail_from: str = 'Bagala <no-reply@bagala.ai>'
     resend_api_key_file: str = '/run/secrets/resend/api.key'
     report_recipient: str = 'sean.chopparapu@gmail.com'
+    # Where footer enquiries (POST /api/enquiries) are mailed; empty falls back to report_recipient.
+    enquiry_recipient: str = ''
     owner_username: str = 'admin'
     schedule_hours: int = 24
     schedule_hour: int = Field(default=8, ge=0, le=23)

@@ -71,6 +71,13 @@ export function resolveLinks(session:Session|null):Links{
 
 export function joinUrl(base:string,path:string):string{return base.replace(/\/+$/,'')+'/'+path.replace(/^\/+/,'')}
 
+/** Job Search → Job Prep hand-off (BRAND.md): `<prep>start?role=…&company=…&source=jobsearch`, each value ≤ 200 characters. */
+export function prepStartUrl(prep:string,title:string,company:string):string{
+ const base=prep.endsWith('/')?prep:prep+'/';
+ const clip=(value:string)=>(value||'').trim().slice(0,200);
+ return base+'start?role='+encodeURIComponent(clip(title))+'&company='+encodeURIComponent(clip(company))+'&source=jobsearch';
+}
+
 export const isOperator=(user:User|null|undefined)=>!!user?.roles.some(r=>['operator','administrator'].includes(r));
 
 export type HubContext={links:Links;operator:boolean};

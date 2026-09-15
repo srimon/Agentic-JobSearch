@@ -5,9 +5,9 @@ export const dataGroups = [
       {
         "id": "clickhouse",
         "name": "ClickHouse",
-        "description": "Explore reconciled production public-listing snapshots and the authenticated read-only SQL console. Daily load at 08:30 Pacific.",
+        "description": "Explore reconciled public-listing snapshots and the authenticated read-only SQL console. Daily load at 08:30 Pacific.",
         "url": "/?view=data-clickhouse",
-        "status": "Production analytics"
+        "status": "Analytics"
       }
     ]
   },
@@ -36,16 +36,16 @@ export const dataGroups = [
       {
         "id": "model",
         "name": "PostgreSQL · SchemaSpy",
-        "description": "Explore production tables and declared relationships using an empty schema copy.",
+        "description": "Explore tables and declared relationships using an empty schema copy.",
         "url": "/?view=model",
-        "status": "Production schema viewer"
+        "status": "Schema viewer"
       },
       {
         "id": "catalog",
         "name": "OpenMetadata · Catalog",
-        "description": "Explore production PostgreSQL and ClickHouse metadata.",
+        "description": "Explore PostgreSQL and ClickHouse metadata.",
         "url": "/?view=data-catalog",
-        "status": "Production catalog"
+        "status": "Catalog"
       }
     ]
   },
@@ -91,7 +91,7 @@ export const dataGroups = [
       {
         "id": "ingestion",
         "name": "ClickHouse ingestion",
-        "description": "Reconciled daily snapshot from production PostgreSQL at 08:30 Pacific after source collection.",
+        "description": "Reconciled daily snapshot from PostgreSQL at 08:30 Pacific after source collection.",
         "url": "/?view=data-ingestion",
         "status": "Scheduled Kubernetes Job"
       },

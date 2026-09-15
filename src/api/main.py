@@ -257,7 +257,8 @@ def save(job_id:uuid.UUID,body:Save,user=Depends(current_user)):
 
 
 @app.get('/api/sources')
-def sources(user=Depends(current_user)):
+def sources(user=Depends(operator)):
+    # Collection coverage and run counts are operator information; members and viewers never see them.
     with connection() as conn:
         return conn.execute('SELECT s.*,r.status AS latest_status,r.fetched,r.matched,r.finished_at FROM jobsearch.sources s LEFT JOIN LATERAL (SELECT * FROM jobsearch.runs WHERE source_id=s.id ORDER BY created_at DESC LIMIT 1) r ON true ORDER BY company').fetchall()
 
@@ -313,7 +314,7 @@ async def observe(request, call_next):
         return response
 
 @app.get('/api/collection-status')
-def collection_status(user=Depends(current_user)):
+def collection_status(user=Depends(operator)):
     from ai_core.agents.scheduler import next_run_at
     with connection() as c:
         sources=c.execute("""SELECT s.company,s.enabled,s.last_success_at,s.last_error,r.status,r.fetched,r.decision_counts,r.trace_id,
@@ -367,4 +368,12 @@ app.include_router(hub_access_router(operator))
 @app.get('/api/workflow')
 def daily_workflow_status(user=Depends(current_user)):
     from src.applications.daily import status
-    return status(user['id'])
+    result=status(user['id'])
+    if not set(user['roles'])&{'operator','administrator'}:
+        # Per-source collection counts are operator information; members keep their own preparation progress.
+        for run in [result.get('latest')]+list(result.get('history') or []):
+            if isinstance(run,dict): run.pop('source_counts',None)
+    return result
+
+from src.api.enquiries import create_router as enquiries_router
+app.include_router(enquiries_router())

@@ -50,14 +50,14 @@ export default function Observability({version}:{version:number}){
  },[tool,expanded]);
  const choose=(key:Tool)=>{setTool(key);setScreen(0);setReload(n=>n+1)};
  return <section className={'observability-panel mbk-monitoring '+(expanded?'obs-expanded':'')} aria-label="Observability tools">
-  <header className="monitor-heading"><div><span className="eyebrow">{staging?'JOBSEARCH STAGING':'JOBSEARCH'}</span><h2>{tool==='phoenix'?'Explainability':'Observability'}</h2><p>{tool==='phoenix'?'Explore the recorded trace of each operation in Phoenix.':'Grafana dashboards and the Prometheus series they are drawn from.'}</p></div></header>
+  <header className="monitor-heading"><div><span className="eyebrow">{'JOB SEARCH'}</span><h2>{tool==='phoenix'?'Explainability':'Observability'}</h2><p>{tool==='phoenix'?'Explore the recorded trace of each operation in Phoenix.':'Grafana dashboards and the Prometheus series they are drawn from.'}</p></div></header>
   <nav className="monitor-purpose" aria-label="Monitoring purpose"><button className={tool!=='phoenix'?'selected':''} onClick={()=>choose('grafana')}>Observability</button><button className={tool==='phoenix'?'selected':''} onClick={()=>choose('phoenix')}>Explainability · Phoenix</button></nav>
   {tool!=='phoenix'&&<div className="monitor-tools" role="tablist" aria-label="Monitoring tool">{(['grafana','prometheus'] as Tool[]).map(key=><button key={key} role="tab" aria-selected={tool===key} className={tool===key?'selected':''} onClick={()=>choose(key)} title={tools[key].description}><i className={'monitor-dot '+health[key]}/>{tools[key].name}</button>)}</div>}
   <div className="monitor-toolbar"><span className="monitor-state" role="status"><i className={'monitor-dot '+health[tool]}/>{current.name} · {health[tool]}{checked&&<small>checked {checked}</small>}</span>
    <div className="monitor-screens">{current.screens.map(([label],index)=><button key={label} className={index===screen?'selected':''} onClick={()=>{setScreen(index);setReload(n=>n+1)}}>{label}</button>)}</div>
    <div className="monitor-actions">{!custom&&<a href={url} target="_blank" rel="noreferrer">Open outside <ExternalLink size={13}/></a>}<button onClick={()=>setReload(n=>n+1)}><RefreshCw size={13}/>Reload</button><button onClick={()=>setExpanded(!expanded)}><Maximize2 size={13}/>{expanded?'Exit expanded':'Expand'}</button></div>
   </div>
-  {staging&&<p className="monitor-context">Separate staging telemetry. Public listings can be refreshed; automatic applications and email are disabled. No collection worker or scheduler is running.</p>}
+  {staging&&<p className="monitor-context">Separate preview telemetry. Public listings can be refreshed; automatic applications and email are disabled. No collection worker or scheduler is running.</p>}
   <div ref={frame} className="monitor-frame-wrap">
    {health[tool]!=='up'?<div className="monitor-message">{health[tool]==='checking'?'Checking '+current.name+'…':current.name+' is unavailable, or your session lacks operator access. This page checks again every 15 seconds.'}</div>:error?<div className="monitor-message error" role="alert">{error}</div>:custom?<PhoenixGraphQLDisplays refreshToken={reload+version}/>:<>
     {!loaded&&<p role="status" className="monitor-loading">Opening {current.name} · {selected[0]}…</p>}
