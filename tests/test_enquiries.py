@@ -1,4 +1,4 @@
-"""Footer enquiries (POST /api/enquiries) and operator-only collection statistics."""
+"""Footer enquiries (POST /api/enquiries) and administrator-only collection statistics."""
 import logging
 import os
 from pathlib import Path
@@ -114,8 +114,8 @@ def test_maintenance_refuses_enquiries(client, monkeypatch):
     assert send(client).status_code == 503
 
 
-@pytest.mark.parametrize('roles,allowed', [(['viewer'], False), (['member'], False), (['operator'], True), (['administrator'], True)])
-def test_collection_statistics_are_operator_only(client, roles, allowed):
+@pytest.mark.parametrize('roles,allowed', [(['viewer'], False), (['member'], False), (['operator'], False), (['member', 'operator'], False), (['administrator'], True)])
+def test_collection_statistics_are_administrator_only(client, roles, allowed):
     with connection() as c:
         c.execute("DELETE FROM jobsearch.users WHERE subject='stats-user'")
         user = c.execute("INSERT INTO jobsearch.users(issuer,subject,roles) VALUES('local','stats-user',%s) RETURNING *", (roles,)).fetchone()

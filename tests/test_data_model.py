@@ -27,10 +27,11 @@ def test_authorization_and_assets(monkeypatch):
         with TestClient(app) as c:
             for path in ('/api/data-model','/api/data-model/report/index.html'):
                 assert c.get(path).status_code==401
-                app.dependency_overrides[current_user]=lambda:{'roles':['member']}
-                assert c.get(path).status_code==403
+                for roles in (['member'],['operator']):
+                    app.dependency_overrides[current_user]=lambda roles=roles:{'roles':roles}
+                    assert c.get(path).status_code==403
                 app.dependency_overrides.clear()
-            app.dependency_overrides[current_user]=lambda:{'roles':['operator']}
+            app.dependency_overrides[current_user]=lambda:{'roles':['administrator']}
             assert c.get('/api/data-model').json()['status']=='ready'
             r=c.get('/api/data-model/report/index.html');assert r.status_code==200
             assert r.headers['cache-control']=='no-store'

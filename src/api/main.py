@@ -15,6 +15,7 @@ from src.applications.dismissals import dismissal_for
 from src.applications.archives import archive_for,require_active,archive_if_emailed
 from ai_core.agents.supervisor import enqueue
 from src.applications.learning import current as learning_model,explain as learning_explain,configure as configure_learning,ranking_sql
+from src.applications.job_filters import STATE_VALUES,TITLE_VALUES,facet_summary
 
 cfg=settings()
 app=FastAPI(title='Jobsearch',docs_url=None,redoc_url=None)
@@ -79,7 +80,19 @@ def current_user(request:Request):
 
 
 def operator(user=Depends(current_user)):
+    # Retained only for the Library gateway authorization (/api/hub/library-authorize), which the hub owns.
     if not set(user['roles']) & {'operator','administrator'}: raise HTTPException(403,'Operator role required')
+    return user
+
+
+def is_administrator(user):
+    return 'administrator' in (user.get('roles') or ())
+
+
+def administrator(user=Depends(current_user)):
+    # Every monitoring and operational display in Job Search (sources, activity, collection status, workflow detail,
+    # observability, monitoring consoles, data management, learning management) is for administrators only.
+    if not is_administrator(user): raise HTTPException(403,'Administrator role required')
     return user
 
 
@@ -129,8 +142,11 @@ def prep_identity(user=Depends(current_user)):
 @app.get('/api/jobs')
 def jobs(q:str=Query('',max_length=200),date:Literal['any','24h','7d','30d']='any',level:str='',
          mode:Literal['','Remote','Hybrid','On-site','Unknown']='',view:Literal['matches','review','saved','emailed','archive']='matches',
-         page:int=Query(1,ge=1),show_dismissed:bool=False,user=Depends(current_user),sort:Literal['newest','recommended']='newest'):
-    if view=='review' and not set(user['roles'])&{'operator','administrator'}: raise HTTPException(403,'Operator role required')
+         page:int=Query(1,ge=1),show_dismissed:bool=False,user=Depends(current_user),sort:Literal['newest','recommended']='newest',
+         state:str=Query('',max_length=12),title:str=Query('',max_length=80)):
+    if view=='review' and not is_administrator(user): raise HTTPException(403,'Administrator role required')
+    if state and state not in STATE_VALUES: raise HTTPException(422,'Unknown state')
+    if title and title not in TITLE_VALUES: raise HTTPException(422,'Unknown job title')
     clauses=[] if view in ('emailed','archive') else ["j.availability='observed_open'"]; values=[]
     if view=='review': clauses.append("j.match_status='review'")
     elif view not in ('emailed','archive'): clauses.append("j.match_status='match' AND j.country_status IN ('us_based','us_remote_eligible')")
@@ -159,6 +175,11 @@ def jobs(q:str=Query('',max_length=200),date:Literal['any','24h','7d','30d']='an
         LEFT JOIN jobsearch.job_archives a ON a.user_id=%s AND a.identity=canonical.posting_key
         WHERE '''+' AND '.join(clauses)
     with private_connection(user['id']) as conn:
+        # Facets use the visible list under every other filter; the chosen state/title then narrows it in SQL.
+        grouped=conn.execute('SELECT j.location,j.title,count(*) AS n'+base+' GROUP BY j.location,j.title',[user['id']]*4+values).fetchall()
+        facets,locations,titles=facet_summary(grouped,state,title)
+        if state: base+=' AND j.location = ANY(%s)'; values.append(locations)
+        if title: base+=' AND j.title = ANY(%s)'; values.append(titles)
         model=learning_model(conn,user['id'])
         order='e.last_emailed_at DESC,j.id' if view=='emailed' else ('a.archived_at DESC,j.id' if view=='archive' else 'j.posted_at DESC NULLS LAST,j.id')
         ranking_params=[]
@@ -171,7 +192,7 @@ def jobs(q:str=Query('',max_length=200),date:Literal['any','24h','7d','30d']='an
         summaries=application_summaries(conn,user['id'],[row['id'] for row in rows])
         for row in rows:
             row.update(summaries.get(str(row['id']),{'application_status':None,'next_action':None}))
-    return {'items':rows,'total':total,'page':page,'page_size':25}
+    return {'items':rows,'total':total,'page':page,'page_size':25,'facets':facets}
 
 
 @app.get('/api/jobs/{job_id}')
@@ -189,7 +210,7 @@ def job_detail(job_id:uuid.UUID,user=Depends(current_user)):
             row['application_status']=decrypt(user['id'],'application:'+str(job_id),record['payload']).get('status') if record else None
             row['last_emailed_at']=conn.execute('SELECT max(emailed_at) AS at FROM jobsearch.emailed_jobs WHERE user_id=%s AND job_id=%s',(user['id'],job_id)).fetchone()['at']
     if not row: raise HTTPException(404,'Job not found')
-    if row['match_status']!='match' and not row.get('last_emailed_at') and not set(user['roles'])&{'operator','administrator'}: raise HTTPException(403,'Operator role required')
+    if row['match_status']!='match' and not row.get('last_emailed_at') and not is_administrator(user): raise HTTPException(403,'Administrator role required')
     return row
 
 
@@ -257,8 +278,8 @@ def save(job_id:uuid.UUID,body:Save,user=Depends(current_user)):
 
 
 @app.get('/api/sources')
-def sources(user=Depends(operator)):
-    # Collection coverage and run counts are operator information; members and viewers never see them.
+def sources(user=Depends(administrator)):
+    # Collection coverage and run counts are administrator information; members, viewers and operators never see them.
     with connection() as conn:
         return conn.execute('SELECT s.*,r.status AS latest_status,r.fetched,r.matched,r.finished_at FROM jobsearch.sources s LEFT JOIN LATERAL (SELECT * FROM jobsearch.runs WHERE source_id=s.id ORDER BY created_at DESC LIMIT 1) r ON true ORDER BY company').fetchall()
 
@@ -270,7 +291,7 @@ class Source(BaseModel):
 
 
 @app.post('/api/sources')
-def add_source(body:Source,user=Depends(operator)):
+def add_source(body:Source,user=Depends(administrator)):
     with connection() as conn:
         row=conn.execute('INSERT INTO jobsearch.sources(company,provider,board,enabled) VALUES(%s,%s,%s,true) ON CONFLICT(provider,board) DO UPDATE SET company=excluded.company RETURNING id',(body.company,body.provider,body.board)).fetchone()
         audit(conn,str(user['id']),'source.register',row['id'])
@@ -278,7 +299,7 @@ def add_source(body:Source,user=Depends(operator)):
 
 
 @app.post('/api/sources/{source_id}/refresh')
-def refresh(source_id:int,user=Depends(operator)):
+def refresh(source_id:int,user=Depends(administrator)):
     with connection() as conn:
         if not conn.execute('SELECT id FROM jobsearch.sources WHERE id=%s AND enabled',(source_id,)).fetchone(): raise HTTPException(404,'Enabled source not found')
         row=enqueue(conn,source_id,str(user['id']))
@@ -286,13 +307,13 @@ def refresh(source_id:int,user=Depends(operator)):
 
 
 @app.get('/api/runs')
-def runs(user=Depends(operator)):
+def runs(user=Depends(administrator)):
     with connection() as conn:
         return conn.execute('SELECT r.*,s.company FROM jobsearch.runs r LEFT JOIN jobsearch.sources s ON s.id=r.source_id ORDER BY created_at DESC LIMIT 100').fetchall()
 
 
 @app.get('/api/audit')
-def audit_events(user=Depends(operator)):
+def audit_events(user=Depends(administrator)):
     with connection() as conn:
         return conn.execute('SELECT * FROM jobsearch.audit_events ORDER BY id DESC LIMIT 100').fetchall()
 
@@ -314,7 +335,7 @@ async def observe(request, call_next):
         return response
 
 @app.get('/api/collection-status')
-def collection_status(user=Depends(operator)):
+def collection_status(user=Depends(administrator)):
     from ai_core.agents.scheduler import next_run_at
     with connection() as c:
         sources=c.execute("""SELECT s.company,s.enabled,s.last_success_at,s.last_error,r.status,r.fetched,r.decision_counts,r.trace_id,
@@ -328,7 +349,8 @@ from src.api.intake import create_router
 app.include_router(create_router(current_user))
 
 @app.get('/api/learning')
-def learning_settings(user=Depends(current_user)):
+def learning_settings(user=Depends(administrator)):
+    # Learning management is administrator-only. Ranking for every user still reads the model inside /api/jobs.
     with private_connection(user['id']) as c:
         model=learning_model(c,user['id'])
         history=c.execute('SELECT id,created_at,model FROM jobsearch.learning_versions WHERE user_id=%s ORDER BY id DESC LIMIT 20',(user['id'],)).fetchall()
@@ -339,38 +361,38 @@ class LearningChange(BaseModel):
     version:int|None=None
 
 @app.put('/api/learning')
-def update_learning(body:LearningChange,user=Depends(current_user)):
-    if not set(user['roles'])&{'member','administrator'}:raise HTTPException(403,'Member role required')
+def update_learning(body:LearningChange,user=Depends(administrator)):
     with private_connection(user['id']) as c:configure_learning(c,user['id'],body.action,body.version)
     return {'ok':True}
 
 from src.api.observability import create_router as observability_router
-app.include_router(observability_router(operator))
+app.include_router(observability_router(administrator))
 
 from src.api.monitoring_ui import create_router as monitoring_ui_router
-app.include_router(monitoring_ui_router(operator))
+app.include_router(monitoring_ui_router(administrator))
 
 from src.api.data_quality import create_router as quality_router
-app.include_router(quality_router(operator))
+app.include_router(quality_router(administrator))
 
 from src.api.data_model import create_router as data_model_router
-app.include_router(data_model_router(operator))
+app.include_router(data_model_router(administrator))
 
 from src.api.analytics import create_router as analytics_router
-app.include_router(analytics_router(operator))
+app.include_router(analytics_router(administrator))
 
 from src.api.governance import create_router as governance_router
-app.include_router(governance_router(operator))
+app.include_router(governance_router(administrator))
 
 from src.api.hub_access import create_router as hub_access_router
+# Library gateway authorization is owned by the hub and still admits operators; see hub_access.py.
 app.include_router(hub_access_router(operator))
 
 @app.get('/api/workflow')
 def daily_workflow_status(user=Depends(current_user)):
     from src.applications.daily import status
     result=status(user['id'])
-    if not set(user['roles'])&{'operator','administrator'}:
-        # Per-source collection counts are operator information; members keep their own preparation progress.
+    if not is_administrator(user):
+        # Per-source collection counts are administrator information; others keep their own preparation progress (the hub reads this).
         for run in [result.get('latest')]+list(result.get('history') or []):
             if isinstance(run,dict): run.pop('source_counts',None)
     return result

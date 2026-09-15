@@ -38,7 +38,7 @@ export default function Observability({version}:{version:number}){
   if(tool==='grafana'&&health.grafana==='up'){
    const uid=path.split('/')[1].split('?')[0];
    void fetch('/api/monitoring/grafana/api/dashboards/uid/'+uid,{cache:'no-store'}).then(r=>{
-    if(!r.ok&&!cancelled)setError(r.status===404?'This dashboard has not been provisioned in this environment.':'The dashboard could not be opened. Check your session and operator access.');
+    if(!r.ok&&!cancelled)setError(r.status===404?'This dashboard has not been provisioned in this environment.':'The dashboard could not be opened. Check your session and administrator access.');
    }).catch(()=>{if(!cancelled)setError('The dashboard check could not reach the server.');});
   }
   return()=>{cancelled=true};
@@ -59,11 +59,11 @@ export default function Observability({version}:{version:number}){
   </div>
   {staging&&<p className="monitor-context">Separate preview telemetry. Public listings can be refreshed; automatic applications and email are disabled. No collection worker or scheduler is running.</p>}
   <div ref={frame} className="monitor-frame-wrap">
-   {health[tool]!=='up'?<div className="monitor-message">{health[tool]==='checking'?'Checking '+current.name+'…':current.name+' is unavailable, or your session lacks operator access. This page checks again every 15 seconds.'}</div>:error?<div className="monitor-message error" role="alert">{error}</div>:custom?<PhoenixGraphQLDisplays refreshToken={reload+version}/>:<>
+   {health[tool]!=='up'?<div className="monitor-message">{health[tool]==='checking'?'Checking '+current.name+'…':current.name+' is unavailable, or your session lacks administrator access. This page checks again every 15 seconds.'}</div>:error?<div className="monitor-message error" role="alert">{error}</div>:custom?<PhoenixGraphQLDisplays refreshToken={reload+version}/>:<>
     {!loaded&&<p role="status" className="monitor-loading">Opening {current.name} · {selected[0]}…</p>}
     <iframe key={url+reload+version} src={url} title={current.name+' — '+selected[0]} className="obs-vendor-frame" style={{height}} onLoad={()=>setLoaded(true)} referrerPolicy="no-referrer"/>
    </>}
   </div>
-  <p className="muted small">Native monitoring interfaces · operator access required · read-only controls. A trace does not prove an application was submitted.</p>
+  <p className="muted small">Native monitoring interfaces · administrator access required · read-only controls. A trace does not prove an application was submitted.</p>
  </section>;
 }

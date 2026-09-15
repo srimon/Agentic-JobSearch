@@ -79,7 +79,10 @@ export function prepStartUrl(prep:string,title:string,company:string):string{
 }
 
 export const isOperator=(user:User|null|undefined)=>!!user?.roles.some(r=>['operator','administrator'].includes(r));
+/** Monitoring and operational displays (sources, activity, collection status, observability, data management, learning management) are administrator-only. */
+export const isAdministrator=(user:User|null|undefined)=>!!user?.roles.includes('administrator');
 
+/** `operator` carries administrator access: embedded operational screens show console links only to administrators. */
 export type HubContext={links:Links;operator:boolean};
 export const HubLinksContext=createContext<HubContext>({links:legacyLinks,operator:false});
 export const useHubLinks=()=>useContext(HubLinksContext);

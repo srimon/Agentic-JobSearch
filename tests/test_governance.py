@@ -16,9 +16,10 @@ def test_governance_scope_permissions_and_missing_snapshot(monkeypatch):
     try:
         with TestClient(app) as client:
             assert client.get('/api/governance').status_code==401
-            app.dependency_overrides[current_user]=lambda:{'roles':['member']}
-            assert client.get('/api/governance').status_code==403
-            app.dependency_overrides[current_user]=lambda:{'roles':['operator']}
+            for roles in (['member'],['operator']):
+                app.dependency_overrides[current_user]=lambda roles=roles:{'roles':roles}
+                assert client.get('/api/governance').status_code==403
+            app.dependency_overrides[current_user]=lambda:{'roles':['administrator']}
             assert client.get('/api/governance').json()=={'status':'not_generated'}
             monkeypatch.setattr(governance,'settings',lambda:SimpleNamespace(data_management_enabled=False))
             assert client.get('/api/governance').status_code==404

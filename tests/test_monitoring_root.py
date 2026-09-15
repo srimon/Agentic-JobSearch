@@ -9,7 +9,7 @@ def test_monitoring_root_never_redirects_to_internal_api(monkeypatch):
         with TestClient(app) as client:
             for path in ('/api/monitoring/phoenix', '/api/monitoring/phoenix/'):
                 assert client.get(path, follow_redirects=False).status_code == 401
-            app.dependency_overrides[current_user] = lambda: {'roles': ['operator']}
+            app.dependency_overrides[current_user] = lambda: {'roles': ['administrator']}
             for path in ('/api/monitoring/phoenix', '/api/monitoring/phoenix/'):
                 response = client.get(path, follow_redirects=False)
                 assert response.status_code == 200

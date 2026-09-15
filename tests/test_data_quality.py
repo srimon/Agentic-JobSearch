@@ -17,9 +17,10 @@ def test_quality_auth_scope_and_missing_schema(monkeypatch):
     try:
         with TestClient(app) as c:
             assert c.get('/api/data-quality').status_code == 401
-            app.dependency_overrides[current_user] = lambda: {'roles': ['member']}
-            assert c.get('/api/data-quality').status_code == 403
-            app.dependency_overrides[current_user] = lambda: {'roles': ['operator']}
+            for roles in (['member'], ['operator']):
+                app.dependency_overrides[current_user] = lambda roles=roles: {'roles': roles}
+                assert c.get('/api/data-quality').status_code == 403
+            app.dependency_overrides[current_user] = lambda: {'roles': ['administrator']}
             response=c.get('/api/data-quality')
             assert response.status_code == 200
             assert response.json()['runs'] == []

@@ -367,7 +367,27 @@ def test_list_canonical_keys_preserve_business_parameters_and_owner_locks(client
     assert client.get('/api/jobs').json()['total']==3
     assert client.get('/api/jobs?view=archive').json()['total']==0
 
+def as_administrators(client):
+    """Learning management is administrator-only; the owners keep their own ids, so RLS isolation is unchanged."""
+    admins=[{**u,'roles':['administrator']} for u in client.users]
+    app.dependency_overrides[current_user]=lambda:admins[0]
+    return admins
+
+def test_learning_management_is_administrator_only_but_ranking_is_not(client):
+    for roles in (['viewer'],['member'],['operator'],['member','operator']):
+        app.dependency_overrides[current_user]=lambda roles=roles:{**client.users[0],'roles':roles}
+        assert client.get('/api/learning').status_code==403
+        for body in ({'action':'pause'},{'action':'resume'},{'action':'reset'},{'action':'restore','version':1}):
+            assert client.put('/api/learning',json=body,headers=HEADERS).status_code==403
+    app.dependency_overrides[current_user]=lambda:client.users[0]
+    ranked=client.get('/api/jobs?sort=recommended').json()
+    assert ranked['total']==1 and ranked['items'][0]['learning']['version']==0
+    admins=as_administrators(client)
+    assert client.get('/api/learning').status_code==200
+    assert client.put('/api/learning',json={'action':'pause'},headers=HEADERS).status_code==200
+
 def test_learning_versions_controls_and_isolation(client):
+    admins=as_administrators(client)
     first=client.get('/api/learning').json()['model']
     assert first['enabled'] and first['rules']==[]
     assert first['version']==0
@@ -384,7 +404,7 @@ def test_learning_versions_controls_and_isolation(client):
     assert client.put('/api/learning',json={'action':'resume'},headers=HEADERS).status_code==200
     assert not client.get('/api/learning').json()['model']['pinned']
     assert client.put('/api/learning',json={'action':'pause'}).status_code==403
-    app.dependency_overrides[current_user]=lambda:client.users[1]
+    app.dependency_overrides[current_user]=lambda:admins[1]
     assert client.put('/api/learning',json={'action':'restore','version':first['version']},headers=HEADERS).status_code==404
     assert client.get('/api/jobs?sort=recommended').status_code==200
 
@@ -392,6 +412,7 @@ def test_learning_feedback_preserves_archive_lock(client):
     from src.applications.private import private_connection
     from src.applications.email_history import record_report
     with private_connection(client.users[0]['id']) as c:record_report(c,client.users[0]['id'],'f'*64,[client.jid],accepted=True)
+    as_administrators(client)
     assert client.put(f'/api/jobs/{client.jid}/dismissal',json={'reason':'not_relevant','feedback_reason':'wrong_function'},headers=HEADERS).status_code==200
     assert client.get('/api/learning').json()['model']['decisions']==1
     assert client.get('/api/jobs?sort=recommended').json()['total']==0
@@ -435,6 +456,7 @@ def test_learning_reads_never_train_write_or_lock(client, monkeypatch):
             yield Proxy()
     monkeypatch.setattr(main,'private_connection',observed)
     monkeypatch.setattr(learning,'train',lambda _:pytest.fail('Read attempted training'))
+    as_administrators(client)
     for path in ('/api/jobs?sort=recommended','/api/jobs?sort=newest','/api/learning'):
         assert client.get(path).status_code==200
     assert all(q.lstrip().upper().startswith('SELECT') for q in statements)
