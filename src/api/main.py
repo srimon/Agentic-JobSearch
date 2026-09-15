@@ -107,7 +107,12 @@ def logout(request:Request,user=Depends(current_user)):
         conn.execute('DELETE FROM jobsearch.sessions WHERE token_hash=%s',(hashlib.sha256(request.cookies['jobsearch_session'].encode()).hexdigest(),))
         audit(conn,str(user['id']),'logout','session')
     # The deletion must carry the same Domain/Secure/SameSite decision as the sign-in cookie or browsers keep the old one.
-    response=JSONResponse({'ok':True}); response.delete_cookie('jobsearch_session',**cookie_options(request)); return response
+    # Sign-out is also forwarded by the library, Preparation and hub front ends, which pass their own public Host, so a
+    # public request deletes the shared Domain cookie and, alongside it, any host-only copy an app host may still hold.
+    options=cookie_options(request)
+    response=JSONResponse({'ok':True}); response.delete_cookie('jobsearch_session',**options)
+    if options['domain']: response.delete_cookie('jobsearch_session',**{**options,'domain':None})
+    return response
 
 from src.auth.signup import create_router as signup_router
 app.include_router(signup_router(current_user))

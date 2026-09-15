@@ -35,6 +35,19 @@ export async function api<T>(path:string,init?:RequestInit):Promise<T>{
  return (text?JSON.parse(text):undefined) as T;
 }
 
+/**
+ * Ends the shared Bagala session and lands on the sign-in screen ("/"), ready to sign in again.
+ * A 401 means the session had already ended, which is the goal, so it still goes to sign-in;
+ * any other failure throws so the caller can say the sign-out did not happen.
+ */
+export async function signOutToSignIn():Promise<void>{
+ let res:Response;
+ try{res=await fetch('/api/auth/logout',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'}})}
+ catch{throw new ApiError(NETWORK_MESSAGE,0)}
+ if(!res.ok&&res.status!==401){const data=await res.json().catch(()=>({}));throw new ApiError(detailText((data as {detail?:unknown}).detail)||'Could not sign out. Please try again.',res.status)}
+ window.location.assign('/');
+}
+
 /** Human copy for a failed request; `map` overrides the wording for specific status codes. */
 export function describeError(e:unknown,map:Partial<Record<number,string>>={}):string{
  if(!(e instanceof ApiError))return e instanceof Error&&e.message?e.message:'Something went wrong. Please try again.';

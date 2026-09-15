@@ -105,6 +105,44 @@ def test_cookie_attributes_follow_request_host(client, monkeypatch):
     monkeypatch.setattr(settings(),'cookie_samesite','strict')
     assert 'SameSite=strict' in client.post('/api/auth/login',json=body,headers=HEADERS).headers['set-cookie']
 
+@pytest.mark.parametrize('host,public',[('library.bagala.ai',True),('prep.bagala.ai',True),('hub.bagala.ai',True),('jobs.bagala.ai',True),
+                                        ('localhost:3001',False),('localhost:3188',False),('localhost:3180',False),('localhost:3105',False)])
+def test_forwarded_logout_ends_session_and_scopes_deletion_to_request_host(client, monkeypatch, host, public):
+    """The library, Preparation and hub gateways forward sign-out with Origin http://localhost:3105 (the one origin the
+    account service trusts) and the visitor's own Host; the public edge adds X-Forwarded-Proto https."""
+    from src.settings import settings
+    monkeypatch.setattr(settings(),'cookie_domain','bagala.ai')
+    monkeypatch.setattr(settings(),'secure_cookies',True)
+    monkeypatch.setattr(settings(),'allowed_origins',['http://localhost:3105','https://jobs.bagala.ai'])
+    assert signin(client).status_code==200
+    raw=client.cookies['jobsearch_session']
+    forwarded={'Origin':'http://localhost:3105','Host':host,**({'X-Forwarded-Proto':'https'} if public else {})}
+    r=client.post('/api/auth/logout',headers=forwarded)
+    assert r.status_code==200
+    deletions=r.headers.get_list('set-cookie')
+    assert all('jobsearch_session=' in c and 'Max-Age=0' in c for c in deletions)
+    if public:
+        # The shared Domain cookie and any host-only copy on the app host are both removed, over HTTPS only.
+        assert len(deletions)==2 and sum('Domain=bagala.ai' in c for c in deletions)==1
+        assert all('Secure' in c for c in deletions)
+    else:
+        assert len(deletions)==1 and 'Domain=' not in deletions[0] and 'Secure' not in deletions[0]
+    client.cookies.clear(); client.cookies.set('jobsearch_session',raw)
+    assert client.get('/api/jobs').status_code==401
+    # Signing out again is refused as signed out; the clients go to sign-in on this answer.
+    assert client.post('/api/auth/logout',headers=forwarded).status_code==401
+
+def test_logout_origin_check(client, monkeypatch):
+    from src.settings import settings
+    monkeypatch.setattr(settings(),'allowed_origins',['http://localhost:3105','https://jobs.bagala.ai'])
+    assert signin(client).status_code==200
+    # An app origin that no gateway translated, a foreign origin and no origin are all refused before the session is touched.
+    for headers in ({'Origin':'https://library.bagala.ai','Host':'library.bagala.ai'},{'Origin':'https://evil.example'},{}):
+        assert client.post('/api/auth/logout',headers=headers).status_code==403
+    assert client.get('/api/session').json()['user']['name']=='Tester'
+    assert client.post('/api/auth/logout',headers={'Origin':'https://jobs.bagala.ai','Host':'jobs.bagala.ai'}).status_code==200
+    assert client.get('/api/session').json()['user'] is None
+
 def test_allowed_origins_list(client, monkeypatch):
     from src.settings import settings
     monkeypatch.setattr(settings(),'allowed_origins',['http://localhost:3105','https://jobs.bagala.ai'])

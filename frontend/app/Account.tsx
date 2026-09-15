@@ -1,7 +1,7 @@
 'use client';
 import {useEffect,useState,type FormEvent} from 'react';
 import {CircleCheck,TriangleAlert,LogOut,MailCheck,KeyRound,MonitorSmartphone,UserRound,ShieldCheck,Copy} from 'lucide-react';
-import {api,describeError,type User} from './session';
+import {api,describeError,signOutToSignIn,type User} from './session';
 import Dialog from './Dialog';
 
 type Profile={username:string;display_name:string;email:string;email_verified:boolean;roles:string[];created_at?:string|null;last_login_at?:string|null;mfa_enabled?:boolean};
@@ -79,7 +79,7 @@ export default function Account({user,version,onSessionChange}:{user:User;versio
   run('mfa-codes',async()=>{const result=await api<{recovery_codes:string[]}>('/auth/mfa/recovery-codes',{method:'POST',body:JSON.stringify({code:mfaCode.trim()})});setMfaForm('none');setMfaCode('');setRecoveryCodes(result.recovery_codes);setMfa({enabled:true,recovery_codes_remaining:result.recovery_codes.length});setMfaNote({kind:'ok',text:'New recovery codes created. The old ones no longer work.'})},
    text=>{setMfaCode('');setMfaNote({kind:'error',text})},{400:'That code did not work. Try the newest code from your app.'})}
 
- function signOut(){run('signout',async()=>{await api('/auth/logout',{method:'POST'});location.reload()},text=>setSessionNote({kind:'error',text}))}
+ function signOut(){run('signout',signOutToSignIn,text=>setSessionNote({kind:'error',text}))}
 
  const roles=profile?.roles||user.roles;
  return <div className="account">

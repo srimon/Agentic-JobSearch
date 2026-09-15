@@ -18,7 +18,7 @@ import ApplicationCheck,{Applications} from './ApplicationCheck';
 import SignIn from './SignIn';
 import Account from './Account';
 import Dialog from './Dialog';
-import {api,type Session,resolveLinks,joinUrl,isOperator,HubLinksContext} from './session';
+import {api,type Session,resolveLinks,joinUrl,isOperator,HubLinksContext,signOutToSignIn,describeError} from './session';
 
 import {CircleCheck,TriangleAlert,Clock3,LockKeyhole,Mail,Archive,Search,Bookmark,ArrowUpRight,MapPin,BriefcaseBusiness,ShieldCheck,Activity,Database,ChevronLeft,ChevronRight,RefreshCw,X,SlidersHorizontal,LogOut,UserRound,ArrowLeft} from 'lucide-react';
 
@@ -56,6 +56,9 @@ export default function Home(){
  const links=useMemo(()=>resolveLinks(session),[session]);
  async function refreshSession(){try{const fresh=await api<Session>('/session');setSession(fresh);if(!fresh.user&&tab==='account')choose('matches')}catch(e){setError((e as Error).message)}}
  const user=session?.user, operator=isOperator(user),member=!!user?.roles.some(r=>['member','administrator'].includes(r));
+ const [signingOut,setSigningOut]=useState(false);
+ // One sign-out for the header and the sidebar: ends the shared session, then the sign-in screen.
+ async function signOut(){if(signingOut)return;setSigningOut(true);try{await signOutToSignIn()}catch(e){setError(describeError(e));setSigningOut(false)}}
 
  useEffect(()=>{const params=new URLSearchParams(window.location.search);if(['workflow','matches','emailed','archive','saved','sources','observability','quality','model','governance','runs','account','data-slack',...dataGroups.flatMap(g=>g.tools.map(t=>'data-'+t.id))].includes(params.get('view')||'')){setTab(params.get('view')!);setDate(params.get('view')==='archive'?'any':'24h');setShowDismissed(params.get('view')==='emailed')}},[]);
  useEffect(()=>{if(!user)return;const id=new URLSearchParams(window.location.search).get('job');if(id&&/^[0-9a-f-]{36}$/i.test(id))api<Job>('/jobs/'+id).then(j=>{if(j.archived_at)setNotice('This job is archived and locked.');else setDetail(j)}).catch(e=>setError(e.message));},[user]);
@@ -114,9 +117,9 @@ export default function Home(){
 
  <div className="scope-card"><span className="eyebrow">SEARCH PROFILE</span><h3>Leadership.<br/>Data & AI.</h3><p>Director / Sr Director / VP / SVP · CTO / CIO / CDO / CAIO</p><span className="country"><span/>United States</span></div>
 
- <div className="identity">{user?<button className="identity-button" aria-current={tab==='account'?'page':undefined} onClick={()=>choose('account')}><ShieldCheck size={18}/><span><strong>{user.name}</strong><small>Bagala account · manage</small></span></button>:<><ShieldCheck size={18}/><div><strong>Private workspace</strong><small>Signed out</small></div></>}{user&&<button className="icon-button" title="Sign out" aria-label="Sign out" onClick={async()=>{await api('/auth/logout',{method:'POST'});location.reload()}}><LogOut size={16}/></button>}</div></aside>
+ <div className="identity">{user?<button className="identity-button" aria-current={tab==='account'?'page':undefined} onClick={()=>choose('account')}><ShieldCheck size={18}/><span><strong>{user.name}</strong><small>Bagala account · manage</small></span></button>:<><ShieldCheck size={18}/><div><strong>Private workspace</strong><small>Signed out</small></div></>}{user&&<button className="icon-button" title="Sign out" aria-label="Sign out" disabled={signingOut} onClick={signOut}><LogOut size={16}/></button>}</div></aside>
 
- <main><header className="topbar app-header"><h2 className="app-title">Job Search</h2><span className="region">US market</span></header>
+ <main><header className="topbar app-header"><h2 className="app-title">Job Search</h2><div className="header-side"><span className="region">US market</span>{user&&<div className="header-account"><span className="header-user" title={user.name}>{user.name}</span><button type="button" className="secondary header-signout" disabled={signingOut} onClick={signOut}><LogOut size={16} aria-hidden/>{signingOut?'Signing out…':'Sign out'}</button></div>}</div></header>
  {session?.features?.maintenance&&<p className="notice" role="status">Maintenance validation · Changes to jobs, profiles and applications are temporarily disabled.</p>}
  {process.env.NEXT_PUBLIC_JOBSEARCH_ENVIRONMENT==='staging'&&<p className="notice" role="status">Staging · Separate public job feed. No automatic applications or email. The default view shows jobs posted in the past 24 hours; choose Any time to inspect older verified listings.</p>}
 
