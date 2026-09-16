@@ -55,6 +55,14 @@ class Settings(BaseSettings):
     worker_max_run_seconds: int = Field(default=900, ge=30, le=7200)
     worker_shutdown_seconds: int = Field(default=60, ge=1, le=300)
     worker_max_attempts: int = Field(default=3, ge=1, le=10)
+    # Administrator console (src/api/admin_console.py). The warehouse identity is read-only and its
+    # password is a mounted file, never an environment value; without the file the console's
+    # warehouse panels say so instead of failing. Prometheus is the ExternalName service in this
+    # namespace that the API already has egress to.
+    admin_clickhouse_url: str = 'http://clickhouse.hub-data.svc.cluster.local:8123'
+    admin_clickhouse_user: str = 'hub_admin_console'
+    admin_clickhouse_password_file: str = '/run/secrets/admin-console/clickhouse-password'
+    admin_prometheus_url: str = 'http://prometheus:9090'
 
     @field_validator('allowed_origins','hub_origins','library_origins','signup_default_roles', mode='before')
     @classmethod

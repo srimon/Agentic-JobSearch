@@ -382,6 +382,10 @@ app.include_router(data_model_router(administrator))
 from src.api.analytics import create_router as analytics_router
 app.include_router(analytics_router(administrator))
 
+from src.api.admin_console import create_router as admin_console_router
+# Web traffic, accounts, conversion and machine load from the shared warehouse and Prometheus.
+app.include_router(admin_console_router(administrator))
+
 from src.api.governance import create_router as governance_router
 app.include_router(governance_router(administrator))
 
