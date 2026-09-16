@@ -44,10 +44,10 @@ class Settings(BaseSettings):
     # Reader questions a non-administrator may ask the Library per UTC day (/api/hub/library-authorize); 0 = unlimited.
     reader_daily_question_limit: int = Field(default=50, ge=0)
     # JSON objects of links the front end shows: public when the request host is on cookie_domain, local otherwise.
-    # Job Prep is advertised at its short path on the shared host; prep.bagala.ai still serves
-    # the same application, so an existing link or bookmark keeps working.
+    # Job Prep and the Library are advertised at their short paths on the shared host; prep.bagala.ai and
+    # library.bagala.ai still serve the same applications, so an existing link or bookmark keeps working.
     hub_links_local: dict[str, str] = {'hub':'http://localhost:3180/','library':'http://localhost:3001/reader','prep':'http://localhost:3188/'}
-    hub_links_public: dict[str, str] = {'hub':'https://hub.bagala.ai/','library':'https://library.bagala.ai/reader','prep':'https://bagala.ai/jobprep/'}
+    hub_links_public: dict[str, str] = {'hub':'https://hub.bagala.ai/','library':'https://bagala.ai/library/reader','prep':'https://bagala.ai/jobprep/'}
     # Session cookie: '' keeps host-only cookies; 'bagala.ai' shares the cookie across *.bagala.ai hosts.
     cookie_domain: str = ''
     cookie_samesite: Literal['lax','strict','none'] = 'lax'

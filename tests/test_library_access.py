@@ -1,5 +1,6 @@
 """The Library gateway: reading, Logs and the Explanatory Tool for every verified account, everything else
-administrators, 50 questions a day."""
+administrators, 50 questions a day - on both of its addresses, the root shape (library.bagala.ai, localhost:3001)
+and the short path on the shared host (bagala.ai/library/)."""
 import os
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -142,6 +143,86 @@ def test_traversal_and_malformed_uris_are_refused_for_everyone(fake_db, roles):
     assert library_policy.classify('GET', '/reader/%2e%2e/api') == library_policy.INVALID
 
 
+PREFIX = '/library'
+
+
+def prefixed(uri):
+    """The same request made on the short path: https://bagala.ai/library/... as the gateway forwards it."""
+    return PREFIX + uri if uri.startswith('/') else uri
+
+
+def test_the_short_path_is_judged_exactly_as_the_root_shape():
+    """Every request the root shape makes, made under /library, gets the same answer: nothing more, nothing less."""
+    cases = ([('GET', u) for u in READER_GETS] + [('HEAD', u) for u in READER_GETS] + [('POST', QUESTION)] +
+             [('GET', u) for u in ADMIN_GETS] + [('POST', u) for u in ADMIN_POSTS] + [('GET', u) for u in TRAVERSAL])
+    for method, uri in cases:
+        assert library_policy.classify(method, prefixed(uri)) == library_policy.classify(method, uri), (method, uri)
+
+
+def test_the_short_path_s_own_spellings():
+    classify = library_policy.classify
+    # /library and /library/ are the front door, which lands on the reader.
+    for uri in ('/library', '/library/', '/library?x=1', '/library//'):
+        assert classify('GET', uri) == library_policy.READER, uri
+    # The console asks for its API route as /library/api/ there (Cloudflare exempts paths containing "/api/").
+    assert classify('POST', '/library/api/?op=ask') == library_policy.QUESTION
+    assert classify('POST', '/library/api?op=ask') == library_policy.QUESTION
+    assert classify('GET', '/library/api/?op=books&limit=500') == library_policy.READER
+    assert classify('GET', '/library/api/?op=health') == library_policy.ADMINISTRATOR
+    assert classify('POST', '/library/api/?op=teach') == library_policy.ADMINISTRATOR
+    # Exactly one prefix comes off; a name that merely starts with it, or another case, is not the prefix.
+    for uri in ('/library/library/reader', '/library/library/api?op=books', '/libraryx/reader', '/library-reader',
+                '/Library/reader', '/LIBRARY/reader', '/libraryreader', '/library/Reader', '/library/reader/operations',
+                '/library/dashboard/', '/library/collections/mbk_books', '/library/api/monitoring/phoenix',
+                '/library/api/system/recent_runs?limit=5', '/library/healthz'):
+        assert classify('GET', uri) == library_policy.ADMINISTRATOR, uri
+    # The prefix does not open a way around the traversal checks.
+    for uri in ('/library/../reader', '/library/../api/system/status', '/library/%2e%2e/api/system/status',
+                '/library%2f..%2fapi', '/library/reader/%252e%252e/x', '/library/./reader', '/library\\reader'):
+        assert classify('GET', uri) == library_policy.INVALID, uri
+    assert library_policy.without_prefix('/library') == '/'
+    assert library_policy.without_prefix('/library/reader/logs') == '/reader/logs'
+    assert library_policy.without_prefix('/libraryx') == '/libraryx'
+
+
+@pytest.mark.parametrize('roles', [['viewer'], ['member'], ['operator']])
+def test_every_signed_in_role_reaches_the_reader_on_the_short_path_and_nothing_else(fake_db, roles):
+    client, _ = fake_db
+    as_user(roles)
+    for uri in READER_GETS:
+        assert authorize(client, prefixed(uri)).status_code == 204, prefixed(uri)
+    # The path decides here; the shared host's own origin is checked below with production's allow-list.
+    for uri in ('/library/api/?op=ask', '/library/api?op=ask'):
+        assert authorize(client, uri, 'POST').status_code == 204, uri
+    for uri in ADMIN_GETS:
+        assert authorize(client, prefixed(uri)).status_code == 403, prefixed(uri)
+    for uri in ADMIN_POSTS:
+        assert authorize(client, prefixed(uri), 'POST').status_code == 403, prefixed(uri)
+    for uri in TRAVERSAL:
+        assert authorize(client, prefixed(uri)).status_code == 403, prefixed(uri)
+
+
+def test_administrators_reach_every_path_on_the_short_path(fake_db):
+    client, _ = fake_db
+    as_user(['administrator'])
+    for uri in READER_GETS + ADMIN_GETS:
+        if '..' in uri: continue
+        assert authorize(client, prefixed(uri)).status_code == 204, prefixed(uri)
+    for uri in ADMIN_POSTS + ('/api/?op=ask',):
+        assert authorize(client, prefixed(uri), 'POST').status_code == 204, prefixed(uri)
+
+
+def test_questions_on_the_short_path_keep_the_origin_check(fake_db, monkeypatch):
+    # A page on https://bagala.ai/library/ posts with the shared host's own origin, which production lists
+    # (JOBSEARCH_LIBRARY_ORIGINS, scripts/jobsearch_release_manifest.py in the hub); any other origin is refused.
+    client, _ = fake_db
+    monkeypatch.setattr(settings(), 'library_origins', ['http://localhost:3001', 'https://library.bagala.ai', 'https://bagala.ai'])
+    as_user(['member'])
+    assert authorize(client, '/library/api/?op=ask', 'POST', origin='https://bagala.ai').status_code == 204
+    assert authorize(client, '/library/api/?op=ask', 'POST', origin='https://evil.example').status_code == 403
+    assert authorize(client, '/library/api/?op=ask', 'POST', origin=None).status_code == 403
+
+
 @pytest.mark.parametrize('extra', [{'active': False}, {'email': 'someone@example.org', 'email_verified_at': None}])
 @pytest.mark.parametrize('roles', [['member'], ['administrator']])
 def test_inactive_and_unverified_accounts_are_refused(fake_db, extra, roles):
@@ -213,6 +294,20 @@ def test_fifty_questions_a_day_then_429_until_utc_midnight(db_client, monkeypatc
     clock['now'] = datetime(2031, 3, 4, 12, 0, tzinfo=timezone.utc)
     as_user(['viewer'])
     assert authorize(client, QUESTION, 'POST').status_code == 204
+
+
+def test_questions_on_both_addresses_share_one_daily_budget(db_client, monkeypatch):
+    """A reader cannot double the limit by asking on library.bagala.ai and on bagala.ai/library/ in turn."""
+    client, _ = db_client
+    monkeypatch.setattr(settings(), 'reader_daily_question_limit', 3)
+    as_user(['member'])
+    statuses = [authorize(client, uri, 'POST').status_code
+                for uri in (QUESTION, '/library/api/?op=ask', QUESTION, '/library/api?op=ask')]
+    assert statuses == [204, 204, 204, 403]
+    over = authorize(client, '/library/api/?op=ask', 'POST')
+    assert over.status_code == 403 and over.headers['x-hub-limit'] == 'reader-daily'
+    # Reading on the short path still works while the limit holds.
+    assert authorize(client, '/library/reader').status_code == 204
 
 
 def test_administrators_and_a_zero_limit_are_unlimited(db_client, monkeypatch):

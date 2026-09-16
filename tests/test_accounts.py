@@ -258,7 +258,8 @@ def test_hub_origins_cors_session_links_and_library_origins(client,monkeypatch):
     local=client.get('/api/session').json()
     assert local['links']==settings().hub_links_local and local['links']['hub']=='http://localhost:3180/'
     public=client.get('/api/session',headers={'Host':'jobs.bagala.ai'}).json()
-    assert public['links']==settings().hub_links_public and public['links']['library']=='https://library.bagala.ai/reader'
+    # The Library is advertised at its short path on the shared host (library.bagala.ai still serves it).
+    assert public['links']==settings().hub_links_public and public['links']['library']=='https://bagala.ai/library/reader'
     # Job Prep is advertised at its short path on the shared host. The trailing slash matters:
     # prepStartUrl (frontend/app/session.ts) appends 'start?role=…' to this value, so the
     # "Prepare for this job" hand-off lands on https://bagala.ai/jobprep/start?role=…

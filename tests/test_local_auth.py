@@ -92,7 +92,8 @@ def test_cookie_domain_uses_forwarded_host_from_the_web_rewrite(client, monkeypa
     r=client.post('/api/auth/login',json=body,headers=rewritten)
     assert r.status_code==200 and 'Domain=bagala.ai' in r.headers['set-cookie'] and 'Secure' in r.headers['set-cookie']
     session=client.get('/api/session',headers={'Host':'api:8100','X-Forwarded-Host':'library.bagala.ai'}).json()
-    assert session['links']['library'].startswith('https://library.bagala.ai')
+    # A public name gets the public links; the Library's is its short path on the shared host.
+    assert session['links']['library'].startswith('https://bagala.ai/library/')
     local=client.get('/api/session',headers={'Host':'api:8100','X-Forwarded-Host':'localhost:3105'}).json()
     assert local['links']['hub'].startswith('http://localhost')
 
