@@ -1,50 +1,136 @@
-/* Administrator console. Gold tokens only (platform/brand/BRAND.md via globals.css), one column
-   from 900px down, and every chart readable where a panel is 400px wide. */
-.admin-console{display:grid;gap:22px}
+/* Administrator console, charts first. Gold tokens only (platform/brand/BRAND.md via globals.css):
+   every colour below is one of the brand variables, none is a new value. Two columns of cards on a
+   wide screen, one from 900px down, and nothing scrolls sideways at 400px. Series are told apart by
+   colour, by dash pattern and by the legend and readout, so colour is never the only channel. */
+.admin-console{display:grid;gap:22px;min-width:0}
+.ac-num{font-variant-numeric:tabular-nums}
+
+/* Visually hidden, still read aloud: the table of numbers behind every chart. */
+.ac-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+
 .ac-toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
-.ac-toolbar>div:first-child{flex:1;min-width:240px}
+.ac-toolbar>div:first-child{flex:1;min-width:220px}
 .ac-toolbar p{margin:8px 0 0;color:var(--muted);line-height:1.6;max-width:70ch}
 .ac-toolbar label{display:grid;gap:6px;font-size:12px;font-weight:600;color:var(--muted)}
-.ac-toolbar select{padding:10px 12px;border:1px solid var(--input-line);border-radius:7px;background:var(--input-bg);color:var(--ink);font-weight:400}
+.ac-toolbar select{padding:10px 12px;border:1px solid var(--input-line);border-radius:7px;background:var(--input-bg);color:var(--ink);font-weight:400;max-width:100%}
+.ac-check{flex-direction:row;align-items:center;display:flex!important;gap:8px;color:var(--ink);padding-bottom:10px}
+.ac-check input{width:16px;height:16px;accent-color:var(--eyebrow)}
+.ac-refresh{display:grid;gap:6px;justify-items:end}
+.ac-refresh p{margin:0;font-size:12px;color:var(--muted)}
 .ac-loading{display:flex;align-items:center;gap:10px;justify-content:center;padding:48px;color:var(--muted);background:var(--surface);border:1px dashed var(--line);border-radius:12px}
 
-.ac-panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px}
+/* What the numbers leave out, before any number. */
+.ac-quality{background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--header-gold);border-radius:12px;padding:16px 20px}
+.ac-quality h2{display:flex;align-items:center;gap:8px;font:600 15px/1.4 Georgia,serif;margin:0 0 8px}
+.ac-quality ul{margin:0;padding-left:20px;display:grid;gap:6px}
+.ac-quality li{color:var(--muted);line-height:1.6;font-size:12px}
+
+/* Per product, and the way a product is chosen. */
+.ac-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
+.ac-strip-card{display:grid;gap:4px;align-content:start;text-align:left;padding:13px 14px;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:11px;color:inherit;font:inherit}
+.ac-strip-card:hover{border-color:var(--header-gold)}
+.ac-strip-on{background:var(--surface-2);border-color:var(--eyebrow);box-shadow:inset 3px 0 0 var(--header-gold)}
+.ac-strip-name{font-weight:700;font-size:13px;overflow-wrap:anywhere}
+.ac-strip-host{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.ac-strip-site .ac-strip-name{font-weight:600;color:var(--muted)}
+.ac-strip-rows{display:grid;gap:2px;margin-top:6px;font-size:12px}
+.ac-strip-rows>span{display:flex;justify-content:space-between;gap:8px}
+.ac-strip-rows i{font-style:normal;color:var(--muted)}
+.ac-strip-rows b{font-weight:700}
+
+.ac-panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px;min-width:0}
 .ac-panel>header{display:flex;gap:14px;align-items:flex-start}
 .ac-icon{display:grid;place-items:center;width:38px;height:38px;flex-shrink:0;border-radius:10px;background:var(--surface-2);border:1px solid var(--line);color:var(--eyebrow)}
 .ac-panel h2{font:600 22px/1.3 Georgia,serif;margin:0}
-.ac-panel h3{font:600 15px/1.4 Georgia,serif;margin:26px 0 10px}
 .ac-source{margin:6px 0 0;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
-.ac-summary{margin:16px 0 0;padding:13px 16px;background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--header-gold);border-radius:8px;line-height:1.65}
+.ac-summary{margin:18px 0 0;padding:13px 16px;background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--header-gold);border-radius:8px;line-height:1.65}
 .ac-summary.ac-warn{background:var(--warn-bg);border-color:var(--line);border-left-color:var(--warn);color:var(--warn-ink)}
 .ac-note{margin:10px 0 0;font-size:12px;color:var(--muted);line-height:1.65}
-.ac-empty{margin:10px 0;font-size:12px;color:var(--muted);padding:14px;border:1px dashed var(--line);border-radius:8px}
 
-.ac-figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:18px}
-.ac-figures>div{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
-.ac-figures strong{display:block;font:600 24px/1.2 Georgia,serif}
+/* Two columns of cards on a wide screen, one below 900px. Each card leads with its chart. */
+.ac-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:18px}
+.ac-card{min-width:0;border:1px solid var(--line);border-radius:11px;padding:16px 18px;background:var(--surface)}
+.ac-card-wide{grid-column:1/-1}
+.ac-card h3{font:600 14px/1.4 Georgia,serif;margin:0 0 12px;overflow-wrap:anywhere}
+.ac-caption{margin:12px 0 0;font-size:12px;color:var(--muted);line-height:1.6}
+@media(max-width:900px){.ac-cards{grid-template-columns:minmax(0,1fr)}}
+
+/* Charts. The svg scales to the card; the viewBox does not. */
+.ac-chart{margin:0}
+.ac-svg{width:100%;height:auto;display:block;touch-action:none}
+.ac-svg:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:6px}
+.ac-grid{stroke:var(--line);stroke-width:1;opacity:.55}
+.ac-axis{stroke:var(--line);stroke-width:1}
+.ac-axis-label{font-size:11px;fill:var(--muted);font-variant-numeric:tabular-nums}
+.ac-line{fill:none;stroke:var(--tone,var(--header-gold));stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
+.ac-line-dashed{stroke-dasharray:5 4}
+.ac-area{fill:var(--tone,var(--header-gold));opacity:.13;stroke:none}
+.ac-cursor{stroke:var(--eyebrow);stroke-width:1;stroke-dasharray:3 3;opacity:.7}
+.ac-dot{fill:var(--tone,var(--header-gold));stroke:var(--surface);stroke-width:1.5}
+.ac-hit{fill:transparent}
+.ac-readout{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin:0 0 8px;font-size:12px;min-height:20px}
+.ac-readout-day{font-weight:700}
+.ac-readout-item{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.ac-readout-item strong{color:var(--ink)}
+.ac-legend{list-style:none;display:flex;flex-wrap:wrap;gap:4px 14px;margin:10px 0 0;padding:0;font-size:12px;color:var(--muted)}
+.ac-legend li{display:inline-flex;align-items:center;gap:6px;min-width:0}
+.ac-legend strong{color:var(--ink);font-variant-numeric:tabular-nums}
+.ac-swatch{width:12px;height:3px;border-radius:2px;flex-shrink:0;background:var(--tone,var(--header-gold))}
+.ac-swatch-dashed{background:repeating-linear-gradient(90deg,var(--tone,var(--header-gold)) 0 4px,transparent 4px 7px)}
+
+/* Six series colours, all brand tokens, each with its own dash pattern so colour is never alone. */
+.ac-tone1{--tone:var(--header-gold)}
+.ac-tone2{--tone:var(--ok)}
+.ac-tone3{--tone:var(--danger)}
+.ac-tone4{--tone:var(--eyebrow)}
+.ac-tone5{--tone:var(--ink)}
+.ac-tone6{--tone:var(--warn)}
+.ac-line.ac-tone4{stroke-dasharray:9 3}
+.ac-line.ac-tone5{stroke-dasharray:2 3}
+.ac-line.ac-tone6{stroke-dasharray:12 3 2 3}
+
+/* A chart that cannot be drawn says why, in the space the chart would have taken. */
+.ac-nochart{display:flex;gap:10px;align-items:flex-start;min-height:74px;padding:14px 16px;margin:0 0 4px;border:1px dashed var(--line);border-radius:9px;background:var(--surface-2);color:var(--muted)}
+.ac-nochart p{margin:0;font-size:12px;line-height:1.6}
+.ac-nochart svg{flex-shrink:0;margin-top:2px}
+
+.ac-bars,.ac-funnel{list-style:none;margin:0;padding:0;display:grid;gap:9px}
+.ac-bars li,.ac-funnel-row{display:grid;grid-template-columns:minmax(0,9rem) minmax(48px,1fr) auto;align-items:center;gap:10px;font-size:12px}
+.ac-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ac-bar-track{height:10px;border-radius:10px;background:var(--surface-3);border:1px solid var(--line);overflow:hidden}
+.ac-bar-fill{display:block;height:100%;background:var(--header-gold)}
+.ac-bar-muted{background:var(--ink-muted)}
+.ac-bar-value{color:var(--muted);white-space:nowrap}
+.ac-bars li.ac-bar-on{font-weight:700}
+.ac-bars li.ac-bar-on .ac-bar-value{color:var(--ink)}
+.ac-bars li.ac-bar-on .ac-bar-track{border-color:var(--eyebrow)}
+.ac-funnel li{display:grid;gap:4px}
+.ac-funnel-gap{font-size:12px;color:var(--muted);padding-left:2px}
+.ac-mark{font-style:normal;font-size:12px;color:var(--muted);margin-left:6px}
+
+.ac-substack{margin:0 0 6px;font-size:12px;color:var(--muted)}
+.ac-stackwrap+.ac-substack{margin-top:16px}
+.ac-stackwrap{display:grid;gap:10px}
+.ac-stack{display:flex;height:22px;border-radius:7px;overflow:hidden;border:1px solid var(--line);background:var(--surface-3)}
+.ac-stack-part{display:block;height:100%;background:var(--tone,var(--header-gold))}
+.ac-stack+.ac-legend{margin:0}
+
+.ac-spark{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.ac-spark svg{width:min(220px,100%);height:46px}
+.ac-spark p{margin:0;display:grid;gap:2px}
+.ac-spark strong{font:600 22px/1.2 Georgia,serif}
+.ac-spark span{font-size:12px;color:var(--muted)}
+
+.ac-figures{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.ac-figures>div{background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.ac-figures strong{display:block;font:600 23px/1.2 Georgia,serif;overflow-wrap:anywhere}
 .ac-figures span{display:block;margin-top:6px;font-size:12px;color:var(--muted);line-height:1.4}
 .ac-figures-plain>div{background:transparent}
 .ac-figures>div.ac-bad strong{color:var(--danger)}
+.ac-figures>div.ac-figure-aside{background:transparent;border-style:dashed}
+.ac-figures>div.ac-figure-aside strong{color:var(--muted)}
 
-.ac-trend{margin:16px 0 0}
-.ac-trend svg{width:100%;height:150px;display:block}
-.ac-area{fill:var(--surface-3);opacity:.85}
-.ac-line{fill:none;stroke:var(--header-gold);stroke-width:2.5}
-.ac-axis{stroke:var(--line);stroke-width:1}
-.ac-dot{fill:var(--ink);opacity:.55}
-.ac-trend figcaption{display:flex;justify-content:space-between;gap:10px;font-size:12px;color:var(--muted);margin-top:4px}
-.ac-peak{font-weight:600;color:var(--ink)}
-
-.ac-bars,.ac-funnel{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:9px}
-.ac-bars li,.ac-funnel li{display:grid;grid-template-columns:minmax(0,10rem) minmax(60px,1fr) auto;align-items:center;gap:10px;font-size:12px}
-.ac-bar-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ac-bar-track{height:9px;border-radius:9px;background:var(--surface-3);border:1px solid var(--line);overflow:hidden}
-.ac-bar-fill{display:block;height:100%;background:var(--header-gold)}
-.ac-bar-value{font-variant-numeric:tabular-nums;color:var(--muted)}
-.ac-funnel li{grid-template-columns:minmax(0,7rem) minmax(60px,1fr) auto}
-
-.ac-split{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:8px 28px}
-.ac-table{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin-top:8px}
+.ac-table{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
 .ac-table table{border-collapse:collapse;width:100%;font-size:12px}
 .ac-table th,.ac-table td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--line);vertical-align:top;white-space:normal}
 .ac-table th{text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-size:12px;white-space:nowrap}
@@ -54,7 +140,7 @@
 .ac-pill-ok{background:var(--tint);color:var(--ok)}
 .ac-pill-bad{background:var(--error-bg);color:var(--danger)}
 
-.ac-measured{margin-top:22px;border-top:1px solid var(--line);padding-top:14px;font-size:12px}
+.ac-measured{margin-top:20px;border-top:1px solid var(--line);padding-top:14px;font-size:12px}
 .ac-measured summary{cursor:pointer;font-weight:600;color:var(--eyebrow)}
 .ac-measured p{margin:12px 0;color:var(--muted);line-height:1.7}
 .ac-measured dl{display:grid;grid-template-columns:1fr;gap:10px;margin:0}
@@ -64,7 +150,20 @@
 
 @media(max-width:760px){
  .ac-panel{padding:18px}
- .ac-bars li,.ac-funnel li{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}
+ .ac-card{padding:14px}
+ .ac-toolbar{padding:16px}
+ .ac-refresh{justify-items:start}
+ .ac-bars li,.ac-funnel-row{grid-template-columns:minmax(0,1fr) auto;row-gap:4px}
  .ac-bar-track{grid-column:1 / -1}
  .ac-measured dl>div{grid-template-columns:1fr}
+ .ac-strip{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+}
+
+/* A card arrives with a short rise. Anyone who has asked for less motion gets none: no draw-in, no
+   transition, the chart is simply there. */
+@media(prefers-reduced-motion:no-preference){
+ .ac-card,.ac-strip-card{animation:ac-arrive .28s ease-out both}
+ .ac-bar-fill,.ac-stack-part{transition:width .3s ease-out}
+ .ac-strip-card{transition:border-color .15s ease-out,background .15s ease-out}
+ @keyframes ac-arrive{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 }

@@ -17,6 +17,18 @@ Where the numbers come from, and what this module is careful about:
 Each answer carries its source, its freshness, a plain-language summary and, per panel, the
 sentence that says how it was measured. A source that is unavailable, unconfigured or empty makes
 its panel say so - it never makes the route fail and it never produces an invented number.
+
+How the figures are counted, so that none of them flatters the products (15 Sep 2026):
+
+* bots are never a visit. Requests the edge classed as a bot are left out of every headline hit and
+  visitor figure and kept as their own series;
+* a sign-up is a self-service account: made through the public sign-up form with an address on it.
+  The console and seed accounts the acceptance script creates carry no address, and they are
+  reported as their own figure - counting them is what made this panel read 98 sign-ups;
+* the funnel starts at the product hosts. The welcome site holds nearly every visitor code the edge
+  sees, so it is charted beside the products and never inside the conversion figure;
+* the wider numbers are still sent, each labelled with what it includes, so the two can be compared
+  rather than one quietly replacing the other.
 """
 import json
 import logging
@@ -36,6 +48,28 @@ log = logging.getLogger('jobsearch.admin_console')
 
 CLICKHOUSE_SOURCE = 'ClickHouse hub_analytics in hub-data, read as hub_admin_console'
 PROMETHEUS_SOURCE = 'Prometheus in hub-observability, scraped every 15 seconds'
+
+# Every public name the edge serves, in the order the console shows them (platform/brand/BRAND.md).
+# The console charts each of these on its own, so the welcome site - which carries nearly every
+# visitor code at the edge - is never mistaken for use of a product.
+PRODUCTS = [
+    {'host': 'jobs.bagala.ai', 'name': 'Job Search', 'kind': 'product'},
+    {'host': 'prep.bagala.ai', 'name': 'Job Prep', 'kind': 'product'},
+    {'host': 'library.bagala.ai', 'name': 'Library', 'kind': 'product'},
+    {'host': 'hub.bagala.ai', 'name': 'Products page', 'kind': 'product'},
+    {'host': 'www.bagala.ai', 'name': 'Welcome site', 'kind': 'site'},
+    {'host': 'bagala.ai', 'name': 'Welcome site (bare domain)', 'kind': 'site'},
+]
+# The screen says this before any number, so nobody reads the console as a marketing figure.
+DATA_QUALITY = [
+    'Bot-classed requests are left out of every visit and visitor figure. Turn on "Show bots" to see them as their own series.',
+    'Sign-ups are self-service accounts only: made through the sign-up form with an address on them. Console and seed accounts - the ones the acceptance script and the operator create - are counted separately and are never sign-ups.',
+    'The funnel starts at the product hosts (Job Search, Job Prep, Library, Products page). A visit to the welcome site is counted, and charted, on its own.',
+    'A visitor is a hashed address re-keyed every ISO week, so a visitor count over more than 7 days is an upper bound and the repeat-visit rate is a floor.',
+]
+# How often the screen refetches every panel by itself. The server cache (45 s) is far shorter, so a
+# refresh - scheduled or by hand - always reads the warehouse again.
+REFRESH_MINUTES = 120
 
 
 def warehouse_source(*tables):
@@ -222,58 +256,86 @@ def count(value):
 def traffic_panel(days):
     entries = queries.traffic(days)
     try:
-        data, notes = collect(entries, {'daily': False, 'by_host': False, 'top_pages': False, 'referrers': False,
-                                        'countries': False, 'status': False, 'slowest': False, 'freshness': True})
+        data, notes = collect(entries, {'daily': False, 'daily_by_host': False, 'daily_visitors': False,
+                                        'by_host': False, 'top_pages': False, 'referrers': False,
+                                        'referrers_by_host': False, 'countries': False, 'countries_by_host': False,
+                                        'status': False, 'status_by_host': False, 'slowest': False, 'freshness': True})
     except SourceUnavailable as exc:
         return unavailable('traffic', warehouse_source('web_hits_v1'), str(exc), entries['daily']['note'])
     body = envelope('traffic', warehouse_source('web_hits_v1'), entries['daily']['note'])
     body['notes'] = notes
     body.update(data)
-    hits = sum(int(row['hits']) for row in data['daily'])
+    all_hits = sum(int(row['hits']) for row in data['daily'])
     bots = sum(int(row['bot_hits']) for row in data['daily'])
+    human = all_hits - bots
     errors = sum(int(row['server_errors']) for row in data['daily'])
-    top = data['by_host'][0]['host'] if data['by_host'] else '—'
-    body['totals'] = {'hits': hits, 'bot_hits': bots, 'server_errors': errors, 'days_with_traffic': len(data['daily']),
-                      'visitors_peak_day': max((int(row['visitors']) for row in data['daily']), default=0)}
+    ranked = sorted(data['by_host'], key=lambda row: int(row['hits']) - int(row['bot_hits']), reverse=True)
+    top = ranked[0]['host'] if ranked else '—'
+    body['totals'] = {'human_hits': human, 'all_hits': all_hits, 'bot_hits': bots, 'server_errors': errors,
+                      'days_with_traffic': len(data['daily']),
+                      'visitors_peak_day': max((int(row['human_visitors']) for row in data['daily_visitors']), default=0),
+                      'product_visitors_peak_day': max((int(row['product_visitors']) for row in data['daily_visitors']), default=0)}
     body['fresh_at'] = data['freshness'].get('last_hit_at')
     body['retention_days'] = queries.RAW_TRAFFIC_DAYS
-    if not hits:
+    body['bot_note'] = queries.BOT_NOTE
+    body['visitor_caveat'] = queries.VISITOR_WEEK_NOTE
+    body['product_note'] = queries.PRODUCT_VISITOR_NOTE
+    if not all_hits:
         body['summary'] = 'No requests reached the public edge in the last {} days.'.format(days)
     else:
-        body['summary'] = ('{} over {} days, {} of them from bots; {} was the busiest product host, and {} '
-                           'came back as a server error.').format(plural(hits, 'request'), days, percent(bots, hits),
-                                                                  top, plural(errors, 'request'))
+        body['summary'] = ('{} from people over {} days, and {} more from bots that every figure here leaves out; '
+                           '{} was the busiest host, and {} came back as a server error.').format(
+            plural(human, 'request'), days, plural(bots, 'request'), top, plural(errors, 'request'))
     return body
 
 
 def accounts_panel(days):
+    """Accounts, counted as people rather than as rows.
+
+    Everything headline here is the self-service population: an account made through the public
+    sign-up form with an address on it. The console and seed accounts the acceptance script creates
+    carry no address, and they are shown as their own figure, never as sign-ups - counting them was
+    what made this panel claim 98 sign-ups when one person had signed up.
+    """
     entries = queries.accounts(days)
     try:
-        data, notes = collect(entries, {'daily': False, 'totals': True, 'mfa': False, 'signins': False,
-                                        'events': False, 'freshness': True})
+        data, notes = collect(entries, {'daily': False, 'self_daily': False, 'self_totals': True, 'totals': True,
+                                        'mfa': False, 'signins': False, 'events': False, 'freshness': True})
     except SourceUnavailable as exc:
-        return unavailable('accounts', warehouse_source('users_v1', 'account_events_v1'), str(exc), entries['daily']['note'])
-    body = envelope('accounts', warehouse_source('users_v1', 'account_events_v1'), entries['daily']['note'])
+        return unavailable('accounts', warehouse_source('users_v1', 'account_events_v1'), str(exc), entries['self_daily']['note'])
+    body = envelope('accounts', warehouse_source('users_v1', 'account_events_v1'), entries['self_daily']['note'])
     body['notes'] = notes
     body.update(data)
+    own = data['self_totals'] or {}
     totals = data['totals'] or {}
-    new_accounts = sum(int(row['accounts']) for row in data['daily'])
+    accounts = int(own.get('accounts') or 0)
+    verified = int(own.get('verified') or 0)
+    with_mfa = int(own.get('with_mfa') or 0)
+    new_accounts = sum(int(row['accounts']) for row in data['self_daily'])
     allowed = sum(int(row['events']) for row in data['signins'] if row['outcome'] == 'allowed')
     refused = sum(int(row['events']) for row in data['signins'] if row['outcome'] != 'allowed')
     body['totals_summary'] = {
-        'new_accounts': new_accounts, 'accounts': int(totals.get('accounts') or 0),
-        'active_accounts': int(totals.get('active_accounts') or 0),
-        'verified_share': share(int(totals.get('verified') or 0), int(totals.get('accounts_with_email') or 0)),
-        'mfa_share': share(int(totals.get('with_mfa') or 0), int(totals.get('active_accounts') or 0)),
+        'accounts': accounts, 'new_accounts': new_accounts,
+        'active_accounts': int(own.get('active_accounts') or 0),
+        'disabled_accounts': int(own.get('disabled_accounts') or 0),
+        'verified': verified, 'with_mfa': with_mfa,
+        'verified_share': share(verified, accounts), 'mfa_share': share(with_mfa, accounts),
+        'unverified_after_a_day': int(own.get('unverified_after_a_day') or 0),
+        'signed_in_in_range': int(own.get('signed_in_in_range') or 0),
+        'ever_signed_in': int(own.get('ever_signed_in') or 0),
+        'internal_accounts': int(own.get('internal_accounts') or 0),
+        'internal_active': int(own.get('internal_active') or 0),
+        'all_accounts': int(totals.get('accounts') or 0),
+        'all_new_accounts': sum(int(row['accounts']) for row in data['daily']),
         'signins_allowed': allowed, 'signins_refused': refused,
     }
-    body['fresh_at'] = data['freshness'].get('last_synced_at') or totals.get('last_synced_at')
-    body['summary'] = ('{} accounts exist, {} of them enabled; {} were created in the last {} days. {} of accounts '
-                       'with an address are verified and {} of enabled accounts use two-step. {} sign-ins were '
-                       'allowed and {} refused in the range.').format(
-        count(totals.get('accounts')), count(totals.get('active_accounts')), count(new_accounts), days,
-        percent(int(totals.get('verified') or 0), int(totals.get('accounts_with_email') or 0)),
-        percent(int(totals.get('with_mfa') or 0), int(totals.get('active_accounts') or 0)),
+    body['counting_rule'] = queries.SELF_SERVICE_NOTE
+    body['fresh_at'] = data['freshness'].get('last_synced_at') or own.get('last_synced_at')
+    body['summary'] = ('{} sign-ups exist, {} of them enabled, and {} were made in the last {} days. {} are verified '
+                       'and {} use two-step. {} console and seed accounts are counted separately and are not sign-ups. '
+                       '{} sign-ins were allowed and {} refused in the range.').format(
+        count(accounts), count(own.get('active_accounts')), count(new_accounts), days,
+        percent(verified, accounts), percent(with_mfa, accounts), count(own.get('internal_accounts')),
         count(allowed), count(refused))
     return body
 
@@ -308,39 +370,57 @@ AI_COST_EVIDENCE = [
 
 
 def monetization_panel(days):
+    """The funnel, counted the way the owner reads it: people using a product, not crawlers on the
+    front page, and self-service sign-ups, not the accounts the acceptance script leaves behind.
+    The wider figures are kept beside it, each labelled with what it includes."""
     entries = queries.monetization(days)
     try:
-        data, notes = collect(entries, {'visitors': True, 'signups': True, 'active': True, 'reach': False,
-                                        'spread': False, 'repeat': True, 'enquiries': False, 'enquiry_pages': False})
+        data, notes = collect(entries, {'visitors': True, 'product_visitors': True, 'signups': True,
+                                        'self_signups': True, 'active': True, 'reach': False, 'spread': False,
+                                        'repeat': True, 'enquiries': False, 'enquiry_pages': False})
     except SourceUnavailable as exc:
-        body = unavailable('monetization', warehouse_source('web_hits_v1', 'users_v1', 'enquiries_v1'), str(exc), entries['visitors']['note'])
+        body = unavailable('monetization', warehouse_source('web_hits_v1', 'users_v1', 'enquiries_v1'), str(exc), entries['product_visitors']['note'])
         body['ai_cost'] = {'recorded': False, 'message': AI_COST_MESSAGE, 'evidence': AI_COST_EVIDENCE}
         return body
-    body = envelope('monetization', warehouse_source('web_hits_v1', 'users_v1', 'enquiries_v1'), entries['visitors']['note'])
+    body = envelope('monetization', warehouse_source('web_hits_v1', 'users_v1', 'enquiries_v1'), entries['product_visitors']['note'])
     body['notes'] = notes
     body.update(data)
-    visitors = int(data['visitors'].get('visitors') or 0)
-    signups = int(data['signups'].get('accounts') or 0)
-    verified = int(data['signups'].get('verified') or 0)
-    active = int(data['active'].get('accounts') or 0)
+    visitors = int(data['product_visitors'].get('visitors') or 0)
+    all_visitors = int(data['visitors'].get('visitors') or 0)
+    signups = int(data['self_signups'].get('accounts') or 0)
+    verified = int(data['self_signups'].get('verified') or 0)
+    signed_in = int(data['self_signups'].get('signed_in') or 0)
     repeat_total = int(data['repeat'].get('visitors') or 0)
     returning = int(data['repeat'].get('returning') or 0)
     body['funnel'] = [
-        {'step': 'Visitors', 'value': visitors, 'of_previous': None},
+        {'step': 'Product visitors', 'value': visitors, 'of_previous': None},
         {'step': 'Sign-ups', 'value': signups, 'of_previous': share(signups, visitors)},
         {'step': 'Verified', 'value': verified, 'of_previous': share(verified, signups)},
-        {'step': 'Signed in', 'value': active, 'of_previous': share(active, verified)},
+        {'step': 'Signed in', 'value': signed_in, 'of_previous': share(signed_in, verified)},
     ]
+    body['funnel_note'] = queries.PRODUCT_VISITOR_NOTE + ' ' + queries.SELF_SERVICE_NOTE
+    body['comparison'] = {'all_visitors': all_visitors,
+                          'all_new_accounts': int(data['signups'].get('accounts') or 0),
+                          'all_signed_in': int(data['active'].get('accounts') or 0)}
+    body['attribution'] = {'signups': SIGNUP_ATTRIBUTION_NOTE, 'enquiries': ENQUIRY_ATTRIBUTION_NOTE}
     body['repeat_rate'] = share(returning, repeat_total)
-    body['fresh_at'] = data['visitors'].get('last_hit_at')
+    body['fresh_at'] = data['product_visitors'].get('last_hit_at')
     body['enquiry_total'] = sum(int(row['enquiries']) for row in data['enquiries'])
     body['visitor_caveat'] = queries.VISITOR_WEEK_NOTE
+    body['bot_note'] = queries.BOT_NOTE
     body['ai_cost'] = {'recorded': False, 'message': AI_COST_MESSAGE, 'evidence': AI_COST_EVIDENCE}
-    body['summary'] = ('{} visitors in {} days became {} sign-ups ({}), {} verified and {} signed in at least once. '
-                       '{} of visitors came back on another day and {} enquiries arrived.').format(
-        count(visitors), days, count(signups), percent(signups, visitors), count(verified), count(active),
-        percent(returning, repeat_total), count(body['enquiry_total']))
+    body['summary'] = ('{} people used a product in {} days ({} more only saw the welcome site) and {} signed up ({} '
+                       'of product visitors), {} verified and {} signed in. {} of visitors came back on another day '
+                       'and {} enquiries arrived.').format(
+        count(visitors), days, count(max(all_visitors - visitors, 0)), count(signups), percent(signups, visitors),
+        count(verified), count(signed_in), percent(returning, repeat_total), count(body['enquiry_total']))
     return body
+
+
+SIGNUP_ATTRIBUTION_NOTE = ('Sign-ups cannot be split per product: one Bagala account covers every product, and the '
+                           'warehouse records no product against an account. They are shown for all products together.')
+ENQUIRY_ATTRIBUTION_NOTE = ('Enquiries cannot be split per product either: enquiries_v1 keeps the page path a message '
+                            'was sent from, not the host, so they are shown for all products together.')
 
 
 AI_COST_MESSAGE = ('Per-call model cost is not recorded anywhere yet, so no cost or revenue figure is shown. '
@@ -480,6 +560,7 @@ def create_router(administrator):
                                                   for name in PANELS})
         return {'range_days': days, 'ranges': list(queries.RANGES),
                 'generated_at': now().isoformat(timespec='seconds'),
-                'cache_seconds': CACHE_SECONDS, 'panels': panels}
+                'cache_seconds': CACHE_SECONDS, 'refresh_minutes': REFRESH_MINUTES,
+                'products': PRODUCTS, 'data_quality': DATA_QUALITY, 'panels': panels}
 
     return router

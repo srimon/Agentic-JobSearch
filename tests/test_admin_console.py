@@ -37,6 +37,31 @@ class FakeWarehouse:
             return [{'last_sample_at': '2026-09-15 12:00:00', 'samples': self.gpu_rows, 'avg_utilisation': 4.5,
                      'peak_utilisation': 22, 'avg_memory_mb': 1100, 'peak_memory_mb': 1300,
                      'total_memory_mb': 4096, 'peak_temperature_c': 65, 'gpu_name': 'Example GPU'}]
+        # The per-product and honestly-counted statements. They are matched first because several of
+        # them start the same way as the all-product ones below.
+        if 'GROUP BY day, host' in sql:
+            return [{'day': '2026-09-15', 'host': 'jobs.example', 'human_hits': 56, 'human_visitors': 4,
+                     'bot_hits': 2, 'server_errors': 1},
+                    {'day': '2026-09-15', 'host': 'www.example', 'human_hits': 60, 'human_visitors': 9,
+                     'bot_hits': 2, 'server_errors': 0}]
+        if 'product_visitors' in sql and 'GROUP BY day' in sql:
+            return [{'day': '2026-09-15', 'human_visitors': 11, 'product_visitors': 4}]
+        if 'GROUP BY host, status_class' in sql:
+            return [{'host': 'jobs.example', 'status_class': '2xx', 'hits': 58, 'bot_hits': 2}]
+        if 'GROUP BY host, country' in sql:
+            return [{'host': 'jobs.example', 'country': 'US', 'hits': 56, 'visitors': 4}]
+        if 'GROUP BY host, referer_host' in sql:
+            return [{'host': 'jobs.example', 'referer_host': 'example.test', 'hits': 5, 'visitors': 2}]
+        if 'internal_accounts' in sql:
+            return [{'accounts': 2, 'active_accounts': 2, 'disabled_accounts': 0, 'verified': 1, 'with_mfa': 1,
+                     'unverified_after_a_day': 0, 'signed_in_in_range': 1, 'ever_signed_in': 1,
+                     'internal_accounts': 96, 'internal_active': 1, 'last_synced_at': '2026-09-15 23:15:00'}]
+        if 'self_service_accounts' in sql:
+            return [{'accounts': 2, 'verified': 1, 'signed_in': 1, 'self_service_accounts': 2}]
+        if 'toDate(created_at) AS day' in sql and 'users_v1' in sql:
+            return [{'day': '2026-09-15', 'accounts': 2, 'verified': 1, 'with_mfa': 1}]
+        if 'host NOT IN' in sql and 'uniq(visitor) AS visitors' in sql:
+            return [{'visitors': 4, 'hits': 116, 'last_hit_at': '2026-09-15 23:00:00'}]
         if 'toDate(ts) AS day' in sql:
             return [{'day': '2026-09-15', 'hits': 120, 'visitors': 9, 'bot_hits': 4, 'server_errors': 1}]
         if 'GROUP BY host\n' in sql and 'uniq(visitor) AS visitors, count() AS hits' in sql:
@@ -223,6 +248,104 @@ def test_every_statement_is_a_bounded_read():
                 for table in re.findall(r'\bFROM\s+([a-z_]+)\.', sql):
                     assert table in ('hub_analytics', 'system'), (name, table)
                 assert entry['note'], name
+
+
+# ----- what the figures count -------------------------------------------------------------------
+# The console used to read 86 visitors and 98 sign-ups when four visitor codes belonged to the
+# products and one person had signed up. These are the rules that fixed it; each is checked at the
+# statement and at the answer, so neither can drift back on its own.
+
+def test_a_bot_request_is_never_counted_as_a_visit(client):
+    signed_in(['administrator'])
+    totals = client.get('/api/admin/traffic').json()['totals']
+    assert totals['all_hits'] == 120 and totals['bot_hits'] == 4
+    assert totals['human_hits'] == totals['all_hits'] - totals['bot_hits'] == 116
+    summary = client.get('/api/admin/traffic').json()['summary']
+    assert 'from bots' in summary and 'leaves out' in summary
+
+
+def test_every_visitor_figure_is_counted_without_bots(client):
+    """Every statement a visitor figure on screen comes from filters bots out, and the two that feed
+    the funnel also leave the welcome site out."""
+    for days in queries.RANGES:
+        groups = {'traffic': queries.traffic(days), 'monetization': queries.monetization(days)}
+        for group, key in (('traffic', 'daily_by_host'), ('traffic', 'daily_visitors'), ('monetization', 'visitors'),
+                           ('monetization', 'product_visitors'), ('monetization', 'reach'), ('monetization', 'spread'),
+                           ('monetization', 'repeat')):
+            assert queries.HUMAN in groups[group][key]['sql'], (group, key)
+        for group, key in (('traffic', 'daily_visitors'), ('monetization', 'product_visitors')):
+            assert queries.NOT_WELCOME in groups[group][key]['sql'], (group, key)
+            assert 'bagala.ai' in queries.WELCOME_HOSTS and 'www.bagala.ai' in queries.WELCOME_HOSTS
+
+
+def test_an_account_without_an_address_is_not_a_sign_up(client):
+    """96 of the 98 rows in jobsearch.users are console and seed accounts the acceptance script made.
+    They are reported on their own line and never as sign-ups, accounts or conversion."""
+    signed_in(['administrator'])
+    totals = client.get('/api/admin/accounts').json()['totals_summary']
+    assert totals['accounts'] == 2 and totals['new_accounts'] == 2, 'sign-ups are the self-service accounts'
+    assert totals['internal_accounts'] == 96, 'console and seed accounts are counted, separately'
+    assert totals['all_accounts'] == 10 and totals['all_accounts'] != totals['accounts'], 'the wider figure is kept, labelled'
+    assert totals['verified_share'] == 0.5 and totals['mfa_share'] == 0.5, 'shares are of the sign-up population'
+    body = client.get('/api/admin/accounts').json()
+    assert 'are not sign-ups' in body['summary']
+    assert 'self-service' in body['counting_rule'] and 'never counted as sign-ups' in body['counting_rule']
+    # And the funnel below its first step counts the same population, not every row.
+    money = client.get('/api/admin/monetization').json()
+    steps = {step['step']: step['value'] for step in money['funnel']}
+    assert steps['Sign-ups'] == 2 and steps['Verified'] == 1 and steps['Signed in'] == 1
+    assert money['comparison']['all_new_accounts'] == 3, 'the all-accounts figure is kept beside it'
+
+
+def test_the_self_service_statements_count_accounts_rather_than_rows():
+    """users_v1 is a ReplacingMergeTree holding every sync of every account (392 rows for 98
+    accounts), so a statement that counts it without FINAL counts syncs."""
+    for days in queries.RANGES:
+        entries = {**queries.accounts(days), **queries.monetization(days)}
+        for key in ('self_daily', 'self_totals', 'self_signups'):
+            sql = entries[key]['sql']
+            assert 'users_v1 FINAL' in sql, key
+            assert 'is_deleted = 0' in sql, key
+            assert queries.SELF_SERVICE in sql, key
+            assert queries.SELF_SERVICE_NOTE in entries[key]['note'], key
+
+
+def test_the_funnel_starts_at_the_product_hosts(client):
+    signed_in(['administrator'])
+    money = client.get('/api/admin/monetization').json()
+    assert money['funnel'][0]['step'] == 'Product visitors' and money['funnel'][0]['value'] == 4
+    assert money['comparison']['all_visitors'] == 40, 'the welcome site is counted, on its own line'
+    assert 'welcome site' in money['summary']
+    assert 'product hosts' in money['funnel_note'] and 'self-service' in money['funnel_note']
+    assert money['visitor_caveat'] and 'upper bound' in money['visitor_caveat']
+    for text in money['attribution'].values():
+        assert 'cannot be split per product' in text
+
+
+def test_every_traffic_chart_can_be_read_per_product(client):
+    signed_in(['administrator'])
+    panel = client.get('/api/admin/traffic').json()
+    for key in ('daily_by_host', 'status_by_host', 'countries_by_host', 'referrers_by_host', 'by_host', 'top_pages', 'slowest'):
+        assert panel[key], key
+        for row in panel[key]:
+            assert row.get('host'), key
+    days = {row['day'] for row in panel['daily_by_host']}
+    assert days and all('host' in row and 'human_hits' in row and 'bot_hits' in row for row in panel['daily_by_host'])
+    assert panel['daily_visitors'][0]['product_visitors'] <= panel['daily_visitors'][0]['human_visitors']
+
+
+def test_the_overview_says_what_it_leaves_out_and_how_often_it_refreshes(client):
+    signed_in(['administrator'])
+    body = client.get('/api/admin/overview').json()
+    hosts = [product['host'] for product in body['products']]
+    assert 'jobs.bagala.ai' in hosts and 'prep.bagala.ai' in hosts and 'library.bagala.ai' in hosts
+    assert 'www.bagala.ai' in hosts and 'bagala.ai' in hosts and 'hub.bagala.ai' in hosts
+    assert [product for product in body['products'] if product['kind'] == 'site'], 'the welcome site is separable'
+    quality = ' '.join(body['data_quality'])
+    assert 'Bot-classed requests are left out' in quality
+    assert 'Console and seed accounts' in quality and 'never sign-ups' in quality
+    assert 'upper bound' in quality
+    assert body['refresh_minutes'] == 120 and body['cache_seconds'] < body['refresh_minutes'] * 60
 
 
 def test_the_client_sends_its_own_caps_and_the_statement_in_the_body():
