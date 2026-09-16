@@ -1,12 +1,13 @@
 "use client";
 import {LoaderCircle,CheckCircle2,TriangleAlert,Clock3} from 'lucide-react';
 import {useEffect,useState} from 'react';
+import {apiFetch} from './session';
 type Source={company:string;enabled:boolean;last_success_at:string|null;last_error:string|null;status:string|null;fetched:number|null;decision_counts:Record<string,number>|null;trace_id:string|null;next_scheduled_at:string|null};
 type Status={sources:Source[];current_matches:number;schedule_hours:number;schedule_hour:number;schedule_timezone:string};
 const names:Record<string,string>={match:'Accepted',outside_us:'Outside US',outside_role:'Outside role scope',sensitive_content:'Sensitive content rejected',unknown_location:'US location unconfirmed',title_review:'Title needs review',guardrail_review:'Content needs review',duplicate:'Duplicate source records'};
 export default function CollectionStatus({version,date}:{version:number;date:string}){
  const [data,setData]=useState<Status|null>(null),[error,setError]=useState(false);
- useEffect(()=>{let active=true;async function load(){try{const r=await fetch('/api/collection-status');if(!r.ok)throw Error();const v=await r.json();if(active){setData(v);setError(false)}}catch{if(active)setError(true)}}load();const timer=setInterval(load,30000);return()=>{active=false;clearInterval(timer)}},[version]);
+ useEffect(()=>{let active=true;async function load(){try{const r=await apiFetch('/collection-status');if(!r.ok)throw Error();const v=await r.json();if(active){setData(v);setError(false)}}catch{if(active)setError(true)}}load();const timer=setInterval(load,30000);return()=>{active=false;clearInterval(timer)}},[version]);
  if(error)return <div className="message" role="status">Collection status is unavailable. Check Activity for run details.</div>;
  if(!data)return <div className="message">Checking collection status…</div>;
  const enabled=data.sources.filter(s=>s.enabled), failed=enabled.filter(s=>s.status==='failed'), pending=enabled.filter(s=>['queued','running'].includes(s.status||''));

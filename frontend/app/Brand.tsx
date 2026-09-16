@@ -3,6 +3,7 @@ import {useState,type FormEvent} from 'react';
 import {LogOut} from 'lucide-react';
 import Dialog from './Dialog';
 import {type User} from './session';
+import {withBase} from './paths';
 
 const SITE='https://www.bagala.ai';
 const THANKS='Thank you. Your message has been sent.';
@@ -18,7 +19,7 @@ export function BrandHeader({user,hub,signingOut,onSignOut,ready=true}:{user:Use
    {hub&&<a href={hub}>Products</a>}
    <a href={SITE+'/help'}>Help</a>
    {user?<span className="brand-account"><span className="brand-user" title={user.name}>{user.name}</span><button type="button" className="brand-button" disabled={signingOut} onClick={onSignOut}><LogOut size={15} aria-hidden/>{signingOut?'Signing out…':'Sign out'}</button></span>
-    :ready&&<a className="brand-button" href="/">Sign in</a>}
+    :ready&&<a className="brand-button" href={withBase('/')}>Sign in</a>}
   </nav>
  </header>;
 }
@@ -47,7 +48,7 @@ function EnquiryDialog({onClose}:{onClose:()=>void}){
   if(message.trim().length<10){setError('Enter a message of at least 10 characters.');return}
   setBusy(true);
   try{
-   const res=await fetch('/__hub/enquiries',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),email:email.trim(),message:message.trim(),company_website:website,page:window.location.pathname.slice(0,200)})});
+   const res=await fetch(withBase('/__hub/enquiries'),{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name.trim(),email:email.trim(),message:message.trim(),company_website:website,page:window.location.pathname.slice(0,200)})});
    if(res.ok){setSent(true);return}
    const data=await res.json().catch(()=>({})) as {detail?:unknown};
    setError(res.status===429?'Too many messages. Please try again later.':res.status===422&&typeof data.detail==='string'?data.detail:'Your message could not be sent. Please try again shortly.');

@@ -1,4 +1,5 @@
 import hashlib
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Request, HTTPException
@@ -98,8 +99,29 @@ def cookie_options(request):
     return {'domain': cfg.cookie_domain if on_cookie_domain(request) else None, 'secure': secure,
             'samesite': cfg.cookie_samesite, 'path': '/', 'httponly': True}
 
+# A short-path prefix as the gateway spells it: plain path segments and nothing else, no "." or
+# ".." among them, so nothing a browser sends can widen a cookie's path, walk it up to the root
+# or move it onto another product's address.
+PREFIX = re.compile(r'^(?:/(?!\.{1,2}(?:/|$))[A-Za-z0-9._~-]{1,40}){1,3}$')
+
+
+def request_prefix(request):
+    """The short path this request arrived under, '' at the root shape.
+
+    One deployment answers https://jobs.bagala.ai/ and https://bagala.ai/jobsearch/. The web app
+    is built under the prefix and its /api rewrite takes the prefix off before the API sees the
+    request, so a cookie scoped to a path has to be told which address the browser is using:
+    the gateway names it in X-Forwarded-Prefix, overwriting whatever the visitor sent
+    (platform/gateway/nginx.conf). Absent means the root shape, which is what loopback and
+    direct callers are."""
+    value = request.headers.get('x-forwarded-prefix', '').split(',')[0].strip().rstrip('/')
+    return value if PREFIX.match(value) else ''
+
+
 def mfa_cookie_options(request):
-    return {**cookie_options(request), 'path': '/api/auth'}
+    """The two-step challenge rides only on the account routes of the address in use: that is
+    /api/auth at the root and /jobsearch/api/auth on the short path."""
+    return {**cookie_options(request), 'path': request_prefix(request) + '/api/auth'}
 
 def mfa_enabled(conn, user_id):
     return conn.execute('SELECT 1 FROM jobsearch.user_mfa WHERE user_id=%s AND enabled_at IS NOT NULL', (user_id,)).fetchone() is not None

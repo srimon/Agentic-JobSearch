@@ -2,13 +2,14 @@
 import {useEffect,useState,type FormEvent,type ReactNode} from 'react';
 import {ShieldCheck,MailCheck,KeyRound,CircleCheck,TriangleAlert} from 'lucide-react';
 import {api,ApiError,describeError,safeNext,rememberNext,recallNext,stripParams,type Session} from './session';
+import {addressLabel} from './paths';
 
 type Mode='signin'|'mfa'|'signup'|'forgot'|'inbox'|'verify'|'reset';
 type InboxKind='signup'|'reset'|'verify';
 const USERNAME_PATTERN='[a-z0-9][a-z0-9_.@+\\-]{2,127}';
 
-/** The signed-out card: sign in (with the optional two-step code), create account, forgot password, inbox, and the email verification and password reset landings. */
-export default function SignIn({session,onSession}:{session:Session|null;onSession:(s:Session)=>void}){
+/** The signed-out card: sign in (with the optional two-step code), create account, forgot password, inbox, and the email verification and password reset landings. `notice` says why the card is showing when a session has just ended. */
+export default function SignIn({session,notice='',onSession}:{session:Session|null;notice?:string;onSession:(s:Session)=>void}){
  const [mode,setMode]=useState<Mode>('signin');
  const [username,setUsername]=useState(''),[password,setPassword]=useState(''),[confirm,setConfirm]=useState(''),[email,setEmail]=useState(''),[displayName,setDisplayName]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[cooldown,setCooldown]=useState(0),[needsVerification,setNeedsVerification]=useState(false);
@@ -108,6 +109,7 @@ export default function SignIn({session,onSession}:{session:Session|null;onSessi
  const emailField=<label>Email<input type="email" autoComplete="email" required maxLength={254} value={email} onChange={e=>setEmail(e.target.value)}/></label>;
 
  return <div className="signin-card"><div className="lock-icon">{icon}</div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2><p>{text}</p>
+  {notice&&mode==='signin'&&<p className="message" role="status">{notice}</p>}
 
   {mode==='signin'&&<form className="login-form" onSubmit={signIn}>
    <label>Username or email<input autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={254} value={username} onChange={e=>setUsername(e.target.value.toLowerCase())}/></label>
@@ -115,7 +117,7 @@ export default function SignIn({session,onSession}:{session:Session|null;onSessi
    {errorLine}
    <button className="primary" disabled={locked}>{busy?'Signing in…':'Sign in'}</button>
    <div className="signin-links"><button type="button" className="link-button" onClick={()=>go('forgot')}>Forgot password?</button>{signupEnabled&&<button type="button" className="link-button" onClick={()=>go('signup')}>Create an account</button>}</div>
-   {next&&<p className="hint">After signing in you will continue to {new URL(next).host}.</p>}
+   {next&&<p className="hint">After signing in you will continue to {addressLabel(next)}.</p>}
    <p className="hint">{signupEnabled?'One Bagala account signs you in to Job Search, Job Prep and Library.':'Sign-up is closed on this site. Accounts are created by your administrator.'}</p>
   </form>}
 

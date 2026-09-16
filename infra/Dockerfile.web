@@ -3,6 +3,11 @@ WORKDIR /app
 ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_JOBSEARCH_ENVIRONMENT=production
 ENV NEXT_PUBLIC_JOBSEARCH_ENVIRONMENT=$NEXT_PUBLIC_JOBSEARCH_ENVIRONMENT
+# The path prefix the application is built under. Next bakes it in, so it is a build argument and
+# not a setting: the image serves https://bagala.ai/jobsearch/ and the gateway gives the same
+# prefix to requests that arrive on https://jobs.bagala.ai/ and the loopback name.
+ARG NEXT_PUBLIC_JOBSEARCH_BASE_PATH=/jobsearch
+ENV NEXT_PUBLIC_JOBSEARCH_BASE_PATH=$NEXT_PUBLIC_JOBSEARCH_BASE_PATH
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./

@@ -2,7 +2,7 @@
 import {useEffect,useState} from 'react';
 import {BookOpen,ExternalLink,RefreshCw} from 'lucide-react';
 import './data-quality.css';
-import {joinUrl,useHubLinks} from './session';
+import {apiFetch,joinUrl,useHubLinks} from './session';
 type Snapshot={status:string;generated_at?:string;report?:{postgres_tables:number;clickhouse_assets:number;lineage_edges:number;scope:string;ml_asset:string}};
 type View='all'|'governance'|'catalog'|'lineage';
 const viewHero:Record<Exclude<View,'all'>,{eyebrow:string;title:string;text:string}>={
@@ -12,7 +12,7 @@ const viewHero:Record<Exclude<View,'all'>,{eyebrow:string;title:string;text:stri
 /** view: opened from one tool in Data Management, so only that tool's part is shown. */
 export default function Governance({view='all'}:{view?:View}){
  const [data,setData]=useState<Snapshot|null>(null),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
- useEffect(()=>{const c=new AbortController();setError('');fetch('/api/governance',{cache:'no-store',signal:c.signal}).then(async r=>{if(!r.ok)throw new Error(r.status===403?'Operator access is required.':'Catalog verification is unavailable.');return r.json()}).then(setData).catch(e=>{if(e.name!=='AbortError')setError(e.message)});return()=>c.abort()},[refresh]);
+ useEffect(()=>{const c=new AbortController();setError('');apiFetch('/governance',{cache:'no-store',signal:c.signal}).then(async r=>{if(!r.ok)throw new Error(r.status===403?'Operator access is required.':'Catalog verification is unavailable.');return r.json()}).then(setData).catch(e=>{if(e.name!=='AbortError')setError(e.message)});return()=>c.abort()},[refresh]);
  const report=data?.report;
  const {links,operator}=useHubLinks(),catalog=operator?links.governance:undefined;
  const hero=view==='all'?{eyebrow:'OPENMETADATA',title:'Understand and govern your data',text:'Explore the catalog, declared data lineage and business definitions.'}:viewHero[view];

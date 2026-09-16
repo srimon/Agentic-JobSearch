@@ -69,13 +69,50 @@ async def boundaries(request,call_next):
     return response
 
 
+# How stale the activity stamp may get before a request writes a fresh one. Without it every
+# authenticated request would be a write; a session is only ever refused after a whole idle
+# window, which is minutes, so a stamp this coarse can never end one early.
+ACTIVITY_REFRESH_SECONDS=30
+IDLE_ENDED='Your session ended after {} minutes without activity. Sign in again to continue.'
+
+
+def idle_minutes_for(user):
+    """The idle allowance this account gets: none for an administrator, who is exempt so that a
+    console or a dashboard left open keeps watching the hub."""
+    return 0 if is_administrator(user) else cfg.idle_minutes
+
+
 def current_user(request:Request):
+    """Every authenticated request in every product comes through here: Job Search's own API, the
+    Library's authorization call and Job Prep's identity call all resolve the shared session.
+
+    Besides the session's own lifetime it enforces the idle limit: a session that has not been
+    used for settings.idle_minutes is deleted and refused, so nothing signs in again on a
+    session that was abandoned. The stamp that measures it is written back only when it has gone
+    stale, so an active session costs one write every ACTIVITY_REFRESH_SECONDS and not one per
+    request."""
     token=request.cookies.get('jobsearch_session','')
     if not token: raise HTTPException(401,'Sign in required')
+    digest=hashlib.sha256(token.encode()).hexdigest()
+    idle=False
     with connection() as conn:
-        user=conn.execute('SELECT u.* FROM jobsearch.sessions s JOIN jobsearch.users u ON u.id=s.user_id WHERE s.token_hash=%s AND s.expires_at>now() AND u.active',
-                          (hashlib.sha256(token.encode()).hexdigest(),)).fetchone()
-    if not user: raise HTTPException(401,'Session expired or access revoked')
+        row=conn.execute("""SELECT u.*, s.last_seen_at,
+                  s.last_seen_at < now()-(%s * interval '1 minute') AS session_idle,
+                  s.last_seen_at < now()-(%s * interval '1 second') AS activity_stale
+                FROM jobsearch.sessions s JOIN jobsearch.users u ON u.id=s.user_id
+                WHERE s.token_hash=%s AND s.expires_at>now() AND u.active""",
+                (max(cfg.idle_minutes,0),ACTIVITY_REFRESH_SECONDS,digest)).fetchone()
+        if row:
+            user={key:value for key,value in row.items() if key not in ('last_seen_at','session_idle','activity_stale')}
+            if idle_minutes_for(user) and row['session_idle']:
+                idle=True
+                conn.execute('DELETE FROM jobsearch.sessions WHERE token_hash=%s',(digest,))
+                audit(conn,str(user['id']),'logout','session','idle')
+            elif row['activity_stale']:
+                conn.execute('UPDATE jobsearch.sessions SET last_seen_at=now() WHERE token_hash=%s',(digest,))
+    # Raised after the deletion and its audit record are committed.
+    if not row: raise HTTPException(401,'Session expired or access revoked')
+    if idle: raise HTTPException(401,IDLE_ENDED.format(cfg.idle_minutes))
     return user
 
 
@@ -107,8 +144,11 @@ def session(request:Request):
     try: user=current_user(request)
     except HTTPException: user=None
     # Links follow the request host so the front end never hard-codes localhost or the public edge.
+    # idle_minutes is this visitor's own allowance (0 for an administrator, who is exempt, and 0
+    # when the limit is off), so the front end can warn just before it runs out.
     return {'user': {'name':user['display_name'],'roles':user['roles']} if user else None,
             'identity_ready':True,'provider':'Local','features':{'data_management':cfg.data_management_enabled,'maintenance':cfg.maintenance_mode},
+            'idle_minutes':idle_minutes_for(user) if user else 0,
             'links':cfg.hub_links_public if on_cookie_domain(request) else cfg.hub_links_local,'signup_enabled':cfg.signup_enabled}
 
 

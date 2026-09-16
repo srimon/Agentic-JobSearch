@@ -4,6 +4,7 @@ import {ExternalLink,RefreshCw,Maximize2} from 'lucide-react';
 import './observability.css';
 import './monitoring-console.css';
 import PhoenixGraphQLDisplays from './PhoenixGraphQLDisplays';
+import {apiFetch,apiPath} from './session';
 
 const graph=(expr:string)=>'query?g0.expr='+encodeURIComponent(expr)+'&g0.tab=graph&g0.range_input=1d';
 const staging=process.env.NEXT_PUBLIC_JOBSEARCH_ENVIRONMENT==='staging';
@@ -21,12 +22,12 @@ export default function Observability({version}:{version:number}){
  const [checked,setChecked]=useState(''),[error,setError]=useState(''),[loaded,setLoaded]=useState(false),[expanded,setExpanded]=useState(false),[height,setHeight]=useState(600);
  const frame=useRef<HTMLDivElement>(null);
  const current=tools[tool],selected=current.screens[screen]||current.screens[0],path=selected[1],custom=path==='graphql-displays';
- const url='/api/monitoring/'+tool+'/'+path;
+ const url=apiPath('/monitoring/')+tool+'/'+path;
  useEffect(()=>{
   let cancelled=false;
   const check=async()=>{
    const entries=await Promise.all((Object.keys(tools) as Tool[]).map(async key=>{
-    try{const r=await fetch('/api/monitoring-status/'+key,{cache:'no-store'});const data=await r.json();return [key,r.ok&&data.available?'up':'down'] as const;}
+    try{const r=await apiFetch('/monitoring-status/'+key,{cache:'no-store'});const data=await r.json();return [key,r.ok&&data.available?'up':'down'] as const;}
     catch{return [key,'down'] as const;}
    }));
    if(!cancelled){setHealth(Object.fromEntries(entries) as Record<Tool,Health>);setChecked(new Date().toLocaleTimeString());}
@@ -37,7 +38,7 @@ export default function Observability({version}:{version:number}){
   setLoaded(custom);setError('');let cancelled=false;
   if(tool==='grafana'&&health.grafana==='up'){
    const uid=path.split('/')[1].split('?')[0];
-   void fetch('/api/monitoring/grafana/api/dashboards/uid/'+uid,{cache:'no-store'}).then(r=>{
+   void apiFetch('/monitoring/grafana/api/dashboards/uid/'+uid,{cache:'no-store'}).then(r=>{
     if(!r.ok&&!cancelled)setError(r.status===404?'This dashboard has not been provisioned in this environment.':'The dashboard could not be opened. Check your session and administrator access.');
    }).catch(()=>{if(!cancelled)setError('The dashboard check could not reach the server.');});
   }

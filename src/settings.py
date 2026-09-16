@@ -13,13 +13,27 @@ def split_list(value):
     return value
 
 
+def origin_of(address):
+    """The scheme://host[:port] of a browser-facing address, which may carry a path.
+
+    A product served at a short path (https://bagala.ai/jobsearch) posts with the Origin of the
+    host it is on, so that is what an origin list has to hold."""
+    text = (address or '').strip()
+    scheme, separator, rest = text.partition('://')
+    if not separator:
+        return text.rstrip('/')
+    return scheme + '://' + rest.split('/')[0]
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=('.env','/run/secrets/app_env'), env_prefix='JOBSEARCH_', extra='ignore')
     database_url: str = ''
     data_management_enabled: bool = False
     maintenance_mode: bool = False
     origin: str = 'http://localhost:3105'
-    # Browser-facing origin used in emailed links; defaults to origin. Production: https://jobs.bagala.ai
+    # Browser-facing address used in emailed links (verification, password reset) and in the
+    # returns other products send here; defaults to origin. It may carry a path, because the
+    # products are moving to short paths on one host: production is https://bagala.ai/jobsearch.
     public_origin: str = ''
     # Origins accepted by the CSRF check for state-changing requests; defaults to origin plus public_origin.
     allowed_origins: Annotated[list[str], NoDecode] = []
@@ -40,6 +54,10 @@ class Settings(BaseSettings):
     # None resolves to True when public_origin is https; the Secure flag is still applied per request.
     secure_cookies: bool | None = None
     session_hours: int = 8
+    # A signed-in account that is not an administrator is signed out after this many minutes
+    # without an authenticated request, in every product that authenticates here (Job Search,
+    # Job Prep, the Library). 0 switches the idle limit off; session_hours still applies.
+    idle_minutes: int = Field(default=5, ge=0)
     signup_enabled: bool = False
     # A new account is a member: viewer alone cannot open Job Prep (it asks for member or above),
     # so self-service sign-ups could reach only Job Search and the Library (16 Sep 2026).
@@ -91,7 +109,10 @@ class Settings(BaseSettings):
         self.origin = self.origin.strip().rstrip('/')
         self.public_origin = (self.public_origin.strip().rstrip('/')) or self.origin
         if not self.allowed_origins:
-            self.allowed_origins = [self.origin] + ([self.public_origin] if self.public_origin != self.origin else [])
+            # An Origin header is scheme://host[:port] and never carries a path, so a public
+            # address on a short path (https://bagala.ai/jobsearch) contributes its origin.
+            public = origin_of(self.public_origin)
+            self.allowed_origins = [self.origin] + ([public] if public != self.origin else [])
         if self.secure_cookies is None:
             self.secure_cookies = self.public_origin.startswith('https://')
         self.cookie_domain = self.cookie_domain.strip().lower().lstrip('.')

@@ -2,7 +2,7 @@
 import {useEffect,useState} from 'react';
 import {Database,RefreshCw,ExternalLink} from 'lucide-react';
 import './data-quality.css';
-import {joinUrl,useHubLinks} from './session';
+import {apiFetch,joinUrl,useHubLinks} from './session';
 type Bucket={label:string;count:number|string};
 type Report={engine:string;scope:string;totals:{listings:number|string;unique_urls:number|string;unknown_dates:number|string};windows:Record<string,{total:number|string;sources:Bucket[];roles:Bucket[];dates:Bucket[]}>;sources:{total:number;errors:number;stale:number;last_success:string|null};changed_rows:number;checks:string;schedule?:string;reconciled_rows?:number;ml?:{view:string;rows:number;label:string;training:string}};
 type Snapshot={status:string;generated_at?:string;report?:Report};
@@ -16,7 +16,7 @@ const viewHero:Record<Exclude<View,'all'>,{eyebrow:string;title:string;text:stri
 export default function Analytics({version,view='all'}:{version:number;view?:View}){
  const [snapshot,setSnapshot]=useState<Snapshot|null>(null),[error,setError]=useState(''),[window,setWindow]=useState('24h'),[refresh,setRefresh]=useState(0);
  const {links,operator}=useHubLinks();
- useEffect(()=>{const controller=new AbortController();setError('');fetch('/api/analytics',{cache:'no-store',signal:controller.signal}).then(async r=>{if(!r.ok)throw new Error(r.status===403?'Operator access is required.':'Analytics snapshot is unavailable.');return r.json()}).then(setSnapshot).catch(e=>{if(e.name!=='AbortError')setError(e.message)});return()=>controller.abort()},[version,refresh]);
+ useEffect(()=>{const controller=new AbortController();setError('');apiFetch('/analytics',{cache:'no-store',signal:controller.signal}).then(async r=>{if(!r.ok)throw new Error(r.status===403?'Operator access is required.':'Analytics snapshot is unavailable.');return r.json()}).then(setSnapshot).catch(e=>{if(e.name!=='AbortError')setError(e.message)});return()=>controller.abort()},[version,refresh]);
  const report=snapshot?.report,selected=report?.windows[window];const stale=snapshot?.generated_at?Date.now()-Date.parse(snapshot.generated_at)>26*3600000:false;
  const hero=view==='all'?{eyebrow:'CLICKHOUSE',title:'Public job-feed analytics',text:'Listing counts, role coverage and source freshness from a reconciled ClickHouse snapshot.'}:viewHero[view];
  const showListings=view==='all'||view==='clickhouse',showIngestion=view==='all'||view==='ingestion',showScience=view==='all'||view==='science';

@@ -1,6 +1,7 @@
 'use client';
 import {useEffect,useMemo,useState} from 'react';
 import {Activity,Clock3,Database,RefreshCw,TriangleAlert} from 'lucide-react';
+import {apiFetch} from './session';
 
 type Point={timestamp:string;okCount?:number|null;errorCount?:number|null;unsetCount?:number|null;totalCount?:number|null;p50?:number|null;p95?:number|null;max?:number|null};
 type Span={spanId:string;name:string;statusCode:string;startTime:string;latencyMs:number|null};
@@ -20,7 +21,7 @@ export default function PhoenixGraphQLDisplays({refreshToken}:{refreshToken:numb
  const [hours,setHours]=useState(24),[data,setData]=useState<Display|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(''),[refresh,setRefresh]=useState(0);
  useEffect(()=>{let cancelled=false;const controller=new AbortController();setLoading(true);setError('');
   const timer=setTimeout(()=>controller.abort(),30000);
-  fetch('/api/phoenix-graphql/displays?hours='+hours,{cache:'no-store',signal:controller.signal}).then(async response=>{if(!response.ok)throw Error(response.status===401?'Your session has expired.':response.status===403?'Operator access is required.':'Phoenix GraphQL display is unavailable.');return response.json()}).then(result=>{if(!cancelled)setData(result)}).catch(reason=>{if(!cancelled)setError(reason.name==='AbortError'?'Phoenix GraphQL timed out.':reason.message)}).finally(()=>{clearTimeout(timer);if(!cancelled)setLoading(false)});
+  apiFetch('/phoenix-graphql/displays?hours='+hours,{cache:'no-store',signal:controller.signal}).then(async response=>{if(!response.ok)throw Error(response.status===401?'Your session has expired.':response.status===403?'Operator access is required.':'Phoenix GraphQL display is unavailable.');return response.json()}).then(result=>{if(!cancelled)setData(result)}).catch(reason=>{if(!cancelled)setError(reason.name==='AbortError'?'Phoenix GraphQL timed out.':reason.message)}).finally(()=>{clearTimeout(timer);if(!cancelled)setLoading(false)});
   return()=>{cancelled=true;clearTimeout(timer);controller.abort()};
  },[hours,refresh,refreshToken]);
  const failures=useMemo(()=>data?.trace_status.reduce((sum,point)=>sum+(point.errorCount??0),0)??0,[data]);

@@ -1,9 +1,40 @@
 'use client';
 import {createContext,useContext} from 'react';
+import {withBase} from './paths';
 
 export type User={name:string;roles:string[]};
 export type Links={hub?:string;library?:string;prep?:string;governance?:string;clickhouse?:string};
-export type Session={user:User|null;identity_ready?:boolean;signup_enabled?:boolean;links?:Partial<Record<string,unknown>>|null;features?:{data_management?:boolean;maintenance?:boolean}};
+export type Session={user:User|null;identity_ready?:boolean;signup_enabled?:boolean;idle_minutes?:number;links?:Partial<Record<string,unknown>>|null;features?:{data_management?:boolean;maintenance?:boolean}};
+
+/**
+ * When this browser last asked the account service for something.
+ *
+ * The idle limit is the server's (src/api/main.py stamps the session row on every authenticated
+ * request); this is the copy the warning dialog counts against, noted where a request is about
+ * to be sent rather than when it comes back, so the dialog is never late.
+ */
+let activeAt=Date.now();
+export function markActivity(){activeAt=Date.now()}
+/** Milliseconds since the last request this browser sent. */
+export function idleFor(){return Date.now()-activeAt}
+
+/**
+ * A same-origin API address on the prefix in use: apiPath('/jobs') is '/api/jobs' on
+ * jobs.bagala.ai and '/jobsearch/api/jobs' on bagala.ai/jobsearch/. Builds a URL and nothing
+ * else, so it is safe in a render (an iframe source, a download link).
+ */
+export function apiPath(path:string):string{return withBase('/api'+path)}
+
+/** One authenticated request to the API, and the moment this browser was last in touch. */
+export function apiFetch(path:string,init?:RequestInit):Promise<Response>{markActivity();return fetch(apiPath(path),init)}
+
+/** The application's own pages on the prefix in use; '/' is the sign-in landing. */
+export const appPath=withBase;
+
+/** Told when a request is refused because the session has ended, so the page can land on sign-in. */
+let sessionEnded:((message:string)=>void)|null=null;
+export function whenSessionEnds(handler:((message:string)=>void)|null){sessionEnded=handler}
+const ENDED_MESSAGE='Your session ended. Sign in again to continue.';
 
 /** HTTP failure with the status and the server's detail text; status 0 means the request never reached the server. */
 export class ApiError extends Error{
@@ -28,9 +59,14 @@ function retryAfterSeconds(header:string|null):number|null{
 
 export async function api<T>(path:string,init?:RequestInit):Promise<T>{
  let res:Response;
- try{res=await fetch('/api'+path,{...init,cache:'no-store',headers:{'Content-Type':'application/json',...init?.headers}})}
+ try{res=await apiFetch(path,{...init,cache:'no-store',headers:{'Content-Type':'application/json',...init?.headers}})}
  catch{throw new ApiError(NETWORK_MESSAGE,0)}
- if(!res.ok){const data=await res.json().catch(()=>({}));throw new ApiError(detailText((data as {detail?:unknown}).detail)||'Unable to load data. Please try again.',res.status,retryAfterSeconds(res.headers.get('Retry-After')))}
+ if(!res.ok){const data=await res.json().catch(()=>({}));
+  const detail=detailText((data as {detail?:unknown}).detail);
+  // A refused session (expired, idle or revoked) is not an error to show inside the workspace:
+  // the page lands on the sign-in screen with the reason the account service gave.
+  if(res.status===401&&path!=='/session')sessionEnded?.(detail||ENDED_MESSAGE);
+  throw new ApiError(detail||'Unable to load data. Please try again.',res.status,retryAfterSeconds(res.headers.get('Retry-After')))}
  const text=await res.text();
  return (text?JSON.parse(text):undefined) as T;
 }
@@ -42,10 +78,10 @@ export async function api<T>(path:string,init?:RequestInit):Promise<T>{
  */
 export async function signOutToSignIn():Promise<void>{
  let res:Response;
- try{res=await fetch('/api/auth/logout',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'}})}
+ try{res=await apiFetch('/auth/logout',{method:'POST',cache:'no-store',headers:{'Content-Type':'application/json'}})}
  catch{throw new ApiError(NETWORK_MESSAGE,0)}
  if(!res.ok&&res.status!==401){const data=await res.json().catch(()=>({}));throw new ApiError(detailText((data as {detail?:unknown}).detail)||'Could not sign out. Please try again.',res.status)}
- window.location.assign('/');
+ window.location.assign(appPath('/'));
 }
 
 /** Human copy for a failed request; `map` overrides the wording for specific status codes. */

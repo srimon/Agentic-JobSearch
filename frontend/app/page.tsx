@@ -19,8 +19,10 @@ import ApplicationCheck,{Applications} from './ApplicationCheck';
 import SignIn from './SignIn';
 import Account from './Account';
 import Dialog from './Dialog';
+import IdleWatch from './IdleWatch';
 import {BrandHeader,BrandFooter} from './Brand';
-import {api,type Session,resolveLinks,prepStartUrl,isAdministrator,HubLinksContext,signOutToSignIn,describeError,safeNext,rememberNext} from './session';
+import {isOwnAddress} from './paths';
+import {api,type Session,resolveLinks,prepStartUrl,isAdministrator,HubLinksContext,signOutToSignIn,describeError,safeNext,rememberNext,whenSessionEnds,appPath} from './session';
 
 import {CircleCheck,TriangleAlert,Clock3,LockKeyhole,Mail,Archive,Search,Bookmark,ArrowUpRight,MapPin,BriefcaseBusiness,ShieldCheck,Activity,Database,ChevronLeft,ChevronRight,RefreshCw,X,SlidersHorizontal,LogOut,UserRound,ArrowLeft,Gauge} from 'lucide-react';
 
@@ -56,7 +58,7 @@ export default function Home(){
  const [sort,setSort]=useState('recommended'),[feedback,setFeedback]=useState<Record<string,string>>({});
  const changing=useRef(false);
  const [busyJob,setBusyJob]=useState<string|null>(null),[lockedIds,setLockedIds]=useState<string[]>([]);
- function finalizeLocal(id:string){setLockedIds(ids=>[...ids,id]);setItems(rows=>rows.filter(j=>j.id!==id));setDetail(null);window.location.replace('/?view=emailed&archived='+encodeURIComponent(id))}
+ function finalizeLocal(id:string){setLockedIds(ids=>[...ids,id]);setItems(rows=>rows.filter(j=>j.id!==id));setDetail(null);window.location.replace(appPath('/?view=emailed&archived='+encodeURIComponent(id)))}
  const [showDismissed,setShowDismissed]=useState(false),[dismissTarget,setDismissTarget]=useState<Job|null>(null),[dismissReason,setDismissReason]=useState('old_posting'),[dismissBusy,setDismissBusy]=useState(false);
  const [items,setItems]=useState<Job[]>([]),[total,setTotal]=useState(0),[sources,setSources]=useState<Source[]>([]),[runs,setRuns]=useState<Run[]>([]),[detail,setDetail]=useState<Job|null>(null),[version,setVersion]=useState(0);
 
@@ -67,6 +69,20 @@ export default function Home(){
  async function refreshSession(){try{const fresh=await api<Session>('/session');setSession(fresh);if(!fresh.user&&tab==='account')choose('matches')}catch(e){setError((e as Error).message)}}
  const user=session?.user, admin=isAdministrator(user),member=!!user?.roles.some(r=>['member','administrator'].includes(r));
  const [signingOut,setSigningOut]=useState(false);
+ // Why the sign-in card is showing, when it is showing because a session ended rather than
+ // because nobody has signed in yet.
+ const [endedNotice,setEndedNotice]=useState('');
+ const idleMinutes=session?.idle_minutes??0;
+ // Any refused request lands here: the workspace is replaced by the sign-in card with the
+ // reason the account service gave, instead of an error banner over a page that cannot load.
+ useEffect(()=>{whenSessionEnds(message=>{setEndedNotice(message);setError('');setDetail(null);setSession(s=>s?{...s,user:null}:s)});return()=>whenSessionEnds(null)},[]);
+ // The idle allowance has run out: ask the account service what is left, which is the request
+ // that deletes the session row, and show the sign-in card with a plain message.
+ async function idleEnded(){
+  setEndedNotice('You were signed out after '+idleMinutes+' minute'+(idleMinutes===1?'':'s')+' without activity.');
+  setError('');setDetail(null);
+  try{setSession(await api<Session>('/session'))}catch{setSession(s=>s?{...s,user:null}:s)}
+ }
  // One sign-out for the header and the sidebar: ends the shared session, then the sign-in screen.
  async function signOut(){if(signingOut)return;setSigningOut(true);try{await signOutToSignIn()}catch(e){setError(describeError(e));setSigningOut(false)}}
 
@@ -77,7 +93,9 @@ export default function Home(){
  useEffect(()=>{api<Session>('/session').then(setSession).catch(e=>setError(e.message))},[]);
  // Another product sent a signed-in visitor here to sign in (?next=...): go straight back instead of showing
  // Opportunities. One bounce per address per minute, so a product that still refuses cannot loop.
- useEffect(()=>{if(!session?.user)return;const params=new URLSearchParams(window.location.search);const next=safeNext(params.get('next'));if(!next||new URL(next).origin===window.location.origin)return;
+ // On the shared host several products answer on one origin, so "already here" is the address
+ // under this product's own prefix, not merely the same origin.
+ useEffect(()=>{if(!session?.user)return;const params=new URLSearchParams(window.location.search);const next=safeNext(params.get('next'));if(!next||isOwnAddress(next))return;
   const key='jobsearch-next-bounce:'+next;let recent=false;try{recent=Date.now()-Number(sessionStorage.getItem(key)||0)<60000;sessionStorage.setItem(key,String(Date.now()))}catch{}
   rememberNext(null);if(!recent)window.location.replace(next);else window.history.replaceState(null,'',window.location.pathname)},[session]);
 
@@ -165,7 +183,7 @@ export default function Home(){
  {user&&admin&&!tab.startsWith('data-')&&!['workflow','observability','admin','quality','model','governance','account'].includes(tab)&&<CollectionStatus version={version} date={date}/>}
  {notice&&<div className="message" role="status">{notice}</div>}
 
- {!session&&!error?<div className="empty">Connecting to your workspace…</div>:!user?<><div className="filters preview-filters"><div className="search"><Search size={19}/><input disabled placeholder="Search title or company" aria-label="Search title or company"/></div><label>Date posted<select disabled defaultValue="Past 24 hours"><option>Any time</option><option>Past 24 hours</option><option>Past 7 days</option><option>Past 30 days</option></select></label></div><SignIn session={session} onSession={setSession}/></>:
+ {!session&&!error?<div className="empty">Connecting to your workspace…</div>:!user?<><div className="filters preview-filters"><div className="search"><Search size={19}/><input disabled placeholder="Search title or company" aria-label="Search title or company"/></div><label>Date posted<select disabled defaultValue="Past 24 hours"><option>Any time</option><option>Past 24 hours</option><option>Past 7 days</option><option>Past 30 days</option></select></label></div><SignIn session={session} notice={endedNotice} onSession={s=>{setEndedNotice('');setSession(s)}}/></>:
 
  tab==='account'?<Account user={user} version={version} onSessionChange={refreshSession}/>:!admin&&adminOnly.includes(tab)?<div className="message">Administrator access is required.</div>:tab==='workflow'?<DailyWorkflow/>:tab.startsWith('data-')?(admin&&dataManagementEnabled?<DataManagement tab={tab} version={version}/>:<div className="message">Data management must be enabled and requires administrator access.</div>):tab==='governance'?(admin?<Governance/>:<div className="message">Administrator access is required.</div>):tab==='model'?(admin?<DataModel version={version}/>:<div className="message">Administrator access is required.</div>):tab==='quality'?(admin?<DataQuality version={version}/>:<div className="message">Administrator access is required.</div>):tab==='observability'?(admin?<Observability version={version}/>:<div className="message">Administrator access is required.</div>):tab==='admin'?(admin?<AdminConsole version={version}/>:<div className="message">Administrator access is required.</div>):tab==='intake'?<Intake/>:tab==='applications'?<Applications version={version}/>:tab==='sources'?<><JobBoards/><div className="table-wrap"><table><thead><tr><th>Company / board</th><th>Provider</th><th>Last successful check</th><th>Latest run</th><th>Candidates</th><th/></tr></thead><tbody>{sources.map(s=><tr key={s.id}><td><strong>{s.company}</strong><small>{s.board}</small></td><td>{s.provider}</td><td>{s.last_success_at?new Date(s.last_success_at).toLocaleString():'Never checked'}</td><td><span className={'badge '+(s.last_error?'warning':'')}>{s.last_error||s.latest_status||'Not started'}</span></td><td>{s.matched??'—'}</td><td>{admin&&<button className="secondary" onClick={async()=>{try{const r=await api<{queued:boolean}>('/sources/'+s.id+'/refresh',{method:'POST'});setNotice(r.queued?'Refresh queued.':'A refresh is already active, or this source cannot be checked again yet.');setVersion(v=>v+1)}catch(e){setError((e as Error).message)}}}>Check source</button>}</td></tr>)}</tbody></table>{!sources.length&&<div className="empty">No sources configured yet.</div>}</div>{admin&&<form className="source-form" onSubmit={async e=>{e.preventDefault();try{await api('/sources',{method:'POST',body:JSON.stringify({company,provider,board})});setCompany('');setBoard('');setVersion(v=>v+1)}catch(e){setError((e as Error).message)}}}><h2>Add an employer board</h2><p className="muted">Use the board identifier from the employer’s official careers page.</p><div className="form-row"><input required value={company} onChange={e=>setCompany(e.target.value)} placeholder="Company name" aria-label="Company name"/><select value={provider} onChange={e=>setProvider(e.target.value)} aria-label="ATS provider"><option value="ashby">Ashby</option><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option></select><input required pattern="[A-Za-z0-9_-]{1,100}" value={board} onChange={e=>setBoard(e.target.value)} placeholder="Board identifier" aria-label="Board identifier"/><button className="primary">Add source</button></div></form>}</>:
 
@@ -190,6 +208,9 @@ export default function Home(){
  {detail&&!detail.archived_at&&!lockedIds.includes(detail.id)&&<Dialog labelledBy="detail-title" onClose={()=>setDetail(null)}><button className="close icon-button" aria-label="Close job details" onClick={()=>setDetail(null)}><X/></button><span className="eyebrow">{detail.company}</span><h2 id="detail-title">{detail.title}</h2>{detail.evidence?.provider==='himalayas'&&<p className="muted small">Data sourced from <a href="https://himalayas.app" target="_blank" rel="noopener noreferrer">Himalayas</a>. The original posting link below returns to the source.</p>}<p className="muted">{detail.location} · {detail.work_mode}</p><div className="message"><strong>Why this appears</strong><p>{detail.reason}</p><p>US evidence: {detail.country_status.replaceAll("_"," ")}. Level: {detail.level}.</p><small>Dates come from the source. For Ashby, this is its last publication date and may reflect republication. Missing dates are excluded from date-limited searches.</small></div><dl><dt>Date posted</dt><dd>{dateText(detail.posted_at)}</dd><dt>First discovered</dt><dd>{detail.first_seen_at?new Date(detail.first_seen_at).toLocaleString():'Unknown'}</dd><dt>Last observed</dt><dd>{new Date(detail.last_seen_at).toLocaleString()}</dd></dl>{!detail.archived_at&&<a className="primary" href={detail.url} target="_blank" rel="noopener noreferrer">Original posting<ArrowUpRight size={17}/></a>}{detail.archived_at&&<p className="message">Archived · Status locked: {dismissalLabels[detail.final_status||'']||detail.final_status}</p>}{!detail.dismissal_reason&&links.prep&&<a className="secondary" href={prepStartUrl(links.prep,detail.title,detail.company)} target="_blank" rel="noopener noreferrer">Prepare for this job<ArrowUpRight size={17}/></a>}{member&&!detail.archived_at&&(submissionBlocked(detail)?<p className="message">{detail.dismissal_reason?'Dismissed — '+dismissalLabels[detail.dismissal_reason]+'. Restore this job to prepare an application.':applied(detail)?'Already applied. Another submission is blocked.':'An attempt is in progress or its outcome is uncertain. Reconcile it before retrying.'}</p>:<ApplicationCheck key={detail.id} jobId={detail.id}/>)}{member&&!detail.archived_at&&<div className="detail-actions"><label>Update status<select aria-label={'Update status for '+detail.title} disabled={!!busyJob} value="" onChange={e=>updateStatus(detail,e.target.value)}><option value="">Choose an action…</option><option value="applied">Successfully applied</option>{Object.entries(dismissalLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>{detail.dismissal_reason&&<button className="secondary" onClick={()=>dismiss(detail,false)}>Restore</button>}</div>}{!detail.archived_at&&detail.next_action&&<div className="message"><strong>Next action</strong><p>{detail.next_action}</p></div>}<h3>Job description</h3><p className="description">{detail.description}</p></Dialog>}
 
  {toast&&<div className="toast" role="status" aria-live="polite"><span>{toast.text}</span>{toast.undo&&<button className="secondary" onClick={()=>undoDismiss(toast.undo!)}>Undo</button>}<button className="icon-button" aria-label="Close notification" onClick={()=>setToast(null)}><X size={16}/></button></div>}
+
+ {/* Administrators are exempt from the idle limit, in the account service and here. */}
+ {user&&!admin&&idleMinutes>0&&<IdleWatch minutes={idleMinutes} onEnded={idleEnded}/>}
 
  </div><BrandFooter/></div></HubLinksContext.Provider>
 
