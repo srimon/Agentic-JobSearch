@@ -18,6 +18,7 @@ Each answer carries its source, its freshness, a plain-language summary and, per
 sentence that says how it was measured. A source that is unavailable, unconfigured or empty makes
 its panel say so - it never makes the route fail and it never produces an invented number.
 """
+import json
 import logging
 import threading
 import time
@@ -120,7 +121,9 @@ def clickhouse(entry):
                         raise SourceUnavailable('The warehouse answer was too large.')
                 if response.status_code != 200:
                     raise SourceUnavailable('The warehouse refused a query.')
-                payload = response.json() if raw else {}
+                # The body is already in `raw`: response.json() would re-read a consumed stream
+                # and raise, which is how every panel reported an unreachable warehouse.
+                payload = json.loads(bytes(raw)) if raw else {}
     except SourceUnavailable:
         raise
     except Exception as exc:
