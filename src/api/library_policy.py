@@ -1,18 +1,23 @@
 """Which Library paths a signed-in visitor may reach through the Library gateway.
 
-The Reader is for every signed-in account; everything else the Library serves (monitoring, operations, logs, RAG,
-VectorDB, architecture, agent information, the explanatory tool, the Qdrant proxy, teaching, data quality and every
-path this list does not know) is for administrators. The gateway sends the visitor's raw request URI in
-X-Original-URI; it is normalised here before matching and a malformed or traversing URI is refused outright.
+The reading page, its Logs and its Explanatory Tool are for every signed-in account; everything else the Library
+serves (monitoring, operations, RAG, VectorDB, architecture, agent information, the run log and plan behind the
+administrators' explanatory tool, the Qdrant proxy, teaching, data quality and every path this list does not know)
+is for administrators. The gateway sends the visitor's raw request URI in X-Original-URI; it is normalised here
+before matching and a malformed or traversing URI is refused outright.
 
-The allow-list is exactly what the Reader page (infra/mbk/web/app/reader/page.tsx, its shell and panels) fetches:
+The allow-list is exactly what those three pages (infra/mbk/web/app/reader/*, their shell and panels) fetch:
   GET  /  (redirects to /reader)           GET  /reader
+  GET  /reader/logs, /reader/explain  (the member views, drawn from the answer already in the browser)
   GET  /_next/*  (scripts, styles, fonts)  GET  /favicon.ico, /icon.svg
   GET  /api/config  (hub links)            GET  /__hub/session  (header name and roles)
   GET  /api?op=books  (the book list)      GET  /api/system/book  (cover and dates)
   GET  /api/system/character  (character panel)
   POST /api?op=ask  (the question; the answer, its citations and cast list come back in this one response)
-The Reader makes no streaming or Qdrant proxy calls.
+Logs and the Explanatory Tool add no call of their own: both read the answer the reading page already holds, which
+is why /api/system/recent_runs (everyone's last questions), /api/system/explain (any run id) and
+/api/system/explain/review stay administrator-only, as does Phoenix under /api/monitoring/. The Reader makes no
+streaming or Qdrant proxy calls.
 """
 import re
 from urllib.parse import parse_qsl, unquote
@@ -23,8 +28,8 @@ ADMINISTRATOR = 'administrator'
 INVALID = 'invalid'
 
 READ_METHODS = frozenset({'GET', 'HEAD'})
-READER_PATHS = frozenset({'/', '/reader', '/favicon.ico', '/icon.svg', '/api/config', '/__hub/session',
-                          '/api/system/book', '/api/system/character'})
+READER_PATHS = frozenset({'/', '/reader', '/reader/logs', '/reader/explain', '/favicon.ico', '/icon.svg',
+                          '/api/config', '/__hub/session', '/api/system/book', '/api/system/character'})
 READER_PREFIXES = ('/_next/',)
 # The console's single API route takes its operation in the query string: /api?op=...
 READER_API_READS = frozenset({'books'})

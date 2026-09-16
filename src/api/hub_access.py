@@ -4,7 +4,11 @@ Every active, verified account may use the Reader; every other Library path is a
 (src/api/library_policy.py). Refusals of a signed-in visitor are 403, never 401, so the gateway shows its no-access
 page instead of sending them back to sign-in. nginx's auth_request passes only 2xx, 401 and 403, so the Reader's
 daily question limit is a 403 carrying X-Hub-Limit: reader-daily and Retry-After, which the gateway turns into a
-JSON 429 for the browser."""
+JSON 429 for the browser.
+
+An allowed request answers 204 with X-Hub-User and X-Hub-Roles. The gateway copies the roles onto the request it
+proxies to the Library, overwriting anything the visitor sent under that name, and the Library API shows another
+reader's question, exception text and the rendered prompt only when that header says administrator."""
 from datetime import datetime, time, timedelta, timezone
 from fastapi import APIRouter,Depends,HTTPException,Request,Response
 from src.db.store import connection,audit
@@ -14,6 +18,17 @@ from src.api import library_policy
 
 SAFE_METHODS={'GET','HEAD','OPTIONS'}
 DAILY_LIMIT_HEADER='reader-daily'
+ROLE_HEADER='X-Hub-Roles'
+# A role name as a header value: letters, digits, dash and underscore, so nothing a role could be
+# named can fold a header or add one of its own.
+ROLE_CHARS=set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_')
+
+def role_header(user):
+    """The account's roles for the gateway to copy onto the proxied request, comma separated.
+    The Library API shows another reader's question, exception text and the prompt only to an administrator, and this
+    is how it is told which one this is; the gateway overwrites whatever the visitor sent under the same name."""
+    roles=[r for r in (user.get('roles') or ()) if isinstance(r,str) and r and set(r)<=ROLE_CHARS]
+    return ','.join(sorted(set(roles)))[:200]
 
 def now():
     """The clock the daily limit reads; tests replace it."""
@@ -60,5 +75,5 @@ def create_router(current_user):
         if limited:
             raise HTTPException(403,"You have reached today's Reader question limit. It resets at midnight UTC.",
                                 headers={'X-Hub-Limit':DAILY_LIMIT_HEADER,'Retry-After':str(seconds_to_utc_midnight(moment)),'Cache-Control':'no-store'})
-        return Response(status_code=204,headers={'X-Hub-User':str(user['id']),'Cache-Control':'no-store'})
+        return Response(status_code=204,headers={'X-Hub-User':str(user['id']),ROLE_HEADER:role_header(user),'Cache-Control':'no-store'})
     return router

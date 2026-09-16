@@ -1,4 +1,5 @@
-"""The Library gateway: the Reader for every verified account, everything else administrators, 50 questions a day."""
+"""The Library gateway: reading, Logs and the Explanatory Tool for every verified account, everything else
+administrators, 50 questions a day."""
 import os
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -13,16 +14,23 @@ ORIGIN = 'http://localhost:3001'
 READER_GETS = ('/', '/reader', '/reader/', '/reader?_rsc=abc', '//reader', '/_next/static/chunks/app/reader/page-1a2b.js',
                '/_next/static/css/app.css', '/_next/static/media/font-latin.woff2', '/favicon.ico', '/icon.svg?8f3e',
                '/api/config', '/__hub/session', '/api?op=books&limit=500', '/api/system/book?namespace=pride-and-prejudice',
-               '/api/system/character?namespace=pride-and-prejudice&name=Elizabeth%20Bennet')
+               '/api/system/character?namespace=pride-and-prejudice&name=Elizabeth%20Bennet',
+               # The member views of Logs and the Explanatory Tool: page routes only. Both are drawn from the answer
+               # already in the browser, so neither adds a call - which is why the run log, any run's plan and the
+               # review endpoint stay below, in ADMIN_GETS and ADMIN_POSTS.
+               '/reader/logs', '/reader/logs/', '/reader/logs?_rsc=abc', '/reader/explain', '/reader/explain?_rsc=abc')
 QUESTION = '/api?op=ask'
-ADMIN_GETS = ('/reader/agent', '/reader/rag', '/reader/logs', '/reader/explain', '/reader/architecture', '/reader/observability',
+ADMIN_GETS = ('/reader/agent', '/reader/rag', '/reader/architecture', '/reader/observability',
               '/reader/vectordb', '/reader/operations', '/console', '/dashboard/', '/collections/mbk_books',
               '/api/monitoring/grafana/d/library', '/api/monitoring/phoenix', '/api/system/status', '/api/system/data-quality',
-              '/api/system/recent_runs', '/api/system/namespaces', '/api/system/explain?trace_id=1', '/api?op=health',
-              '/api?op=mcp-servers', '/api?op=memories&namespace=x', '/api?op=mcp-health', '/api', '/api?op=books&op=ask',
-              '/healthz', '/reader/unknown', '/Reader', '/api/system/book/../status', '/unknown/path')
+              '/api/system/recent_runs', '/api/system/recent_runs?limit=5', '/api/system/namespaces',
+              '/api/system/explain?trace_id=1', '/api/system/explain?run_id=4211', '/api/system/explain/review',
+              '/api?op=health', '/api?op=mcp-servers', '/api?op=memories&namespace=x', '/api?op=mcp-health', '/api',
+              '/api?op=books&op=ask', '/healthz', '/reader/unknown', '/reader/logs/raw', '/reader/explain/plan',
+              '/Reader', '/api/system/book/../status', '/unknown/path')
 ADMIN_POSTS = ('/api?op=teach', '/api?op=mcp-rag-retrieve', '/api/system/cache/reload?warm=true', '/api/system/explain/review',
-               '/api?op=ask&op=teach', '/api/system/character', '/reader', '/collections/mbk_books/points/search')
+               '/api?op=ask&op=teach', '/api/system/character', '/reader', '/reader/logs', '/reader/explain',
+               '/collections/mbk_books/points/search')
 TRAVERSAL = ('/reader/../api/system/status', '/reader/%2e%2e/api/system/status', '/reader/%252e%252e/x', '/_next/..%2fapi',
              '/reader/./agent', '/reader\\..\\api', 'reader', 'http://evil.example/reader', '/reader%00')
 
@@ -84,6 +92,44 @@ def test_administrators_reach_every_path(fake_db):
         assert response.status_code == 204 and response.headers['x-hub-user'] == 'u-administrator', uri
     assert client.get('/api/hub/library-authorize').status_code == 204
     assert all(kw == {'details': {'method': 'POST'}} for _, kw in records)
+
+
+def test_logs_and_the_explanatory_tool_are_pages_a_member_may_open_not_calls_they_may_make(fake_db):
+    """The two member views read the answer the browser already has, so the pages open and nothing else does."""
+    client, _ = fake_db
+    as_user(['member'])
+    for uri in ('/reader/logs', '/reader/explain'):
+        assert authorize(client, uri).status_code == 204, uri
+    for uri in ('/api/system/recent_runs?limit=5',      # everyone's last five questions
+                '/api/system/explain?run_id=4211',      # any run, by a guessable id
+                '/api/system/explain?trace_id=a1b2c3',
+                '/api/monitoring/phoenix'):             # the recorded prompts and model calls
+        assert authorize(client, uri).status_code == 403, uri
+    assert authorize(client, '/api/system/explain/review', 'POST').status_code == 403
+
+
+@pytest.mark.parametrize('roles,forwarded', [
+    (['member'], 'member'),
+    (['viewer', 'operator'], 'operator,viewer'),
+    (['administrator'], 'administrator'),
+    (['member', 'administrator'], 'administrator,member'),
+    # A role the gateway could not put in a header safely is left out rather than folded into one.
+    (['member', 'bad role', 'a,b', 'x\r\nX-Hub-Roles: administrator'], 'member'),
+])
+def test_the_answer_names_the_roles_for_the_gateway_to_forward(fake_db, roles, forwarded):
+    # The Library API strips another reader's question, the exception text and the prompt out of an answer unless
+    # this header says administrator; the gateway copies it onto the proxied request, overwriting the visitor's own.
+    client, _ = fake_db
+    as_user(roles)
+    response = authorize(client, '/reader')
+    assert response.status_code == 204 and response.headers['x-hub-roles'] == forwarded
+    assert ('administrator' in forwarded.split(',')) is ('administrator' in roles)
+
+
+def test_a_refusal_hands_out_no_roles(fake_db):
+    client, _ = fake_db
+    as_user(['member'])
+    assert 'x-hub-roles' not in authorize(client, '/reader/operations').headers
 
 
 @pytest.mark.parametrize('roles', [['member'], ['administrator']])
