@@ -62,7 +62,7 @@ def test_signup_creates_unverified_user_and_queues_mail(client):
     assert r.status_code==202 and r.json()=={'detail':'check your email'}
     with connection() as c:
         user=c.execute("SELECT * FROM jobsearch.users WHERE subject='newuser'").fetchone()
-    assert user['email']=='New.User@example.com' and user['email_verified_at'] is None and user['roles']==['viewer']
+    assert user['email']=='New.User@example.com' and user['email_verified_at'] is None and user['roles']==['member']  # a new account can open every product
     assert user['active'] and user['display_name']=='New User' and user['created_at'] and user['password_hash'].startswith('$argon2id$')
     rows=queued('verify')
     assert len(rows)==1 and rows[0]['to_address']=='New.User@example.com' and rows[0]['status']=='queued' and rows[0]['attempts']==0
@@ -207,7 +207,7 @@ def test_profile_password_and_sessions(client):
     signed_up_and_verified(client)
     profile=client.get('/api/auth/profile').json()
     assert profile['username']=='newuser' and profile['email']=='New.User@example.com' and profile['email_verified'] is True
-    assert profile['roles']==['viewer'] and profile['created_at'] and profile['last_login_at'] and 'password_hash' not in profile
+    assert profile['roles']==['member'] and profile['created_at'] and profile['last_login_at'] and 'password_hash' not in profile
     with TestClient(app) as other:
         assert login(other).status_code==200
         listed=client.get('/api/auth/sessions').json()
@@ -259,6 +259,10 @@ def test_hub_origins_cors_session_links_and_library_origins(client,monkeypatch):
     assert local['links']==settings().hub_links_local and local['links']['hub']=='http://localhost:3180/'
     public=client.get('/api/session',headers={'Host':'jobs.bagala.ai'}).json()
     assert public['links']==settings().hub_links_public and public['links']['library']=='https://library.bagala.ai/reader'
+    # Job Prep is advertised at its short path on the shared host. The trailing slash matters:
+    # prepStartUrl (frontend/app/session.ts) appends 'start?role=…' to this value, so the
+    # "Prepare for this job" hand-off lands on https://bagala.ai/jobprep/start?role=…
+    assert public['links']['prep']=='https://bagala.ai/jobprep/' and public['links']['prep'].endswith('/')
     assert client.get('/api/session',headers={'Host':'notbagala.ai'}).json()['links']==settings().hub_links_local
 
 def test_mailer_log_transport_marks_sent(client,capsys):

@@ -30,8 +30,10 @@ class Settings(BaseSettings):
     # Reader questions a non-administrator may ask the Library per UTC day (/api/hub/library-authorize); 0 = unlimited.
     reader_daily_question_limit: int = Field(default=50, ge=0)
     # JSON objects of links the front end shows: public when the request host is on cookie_domain, local otherwise.
+    # Job Prep is advertised at its short path on the shared host; prep.bagala.ai still serves
+    # the same application, so an existing link or bookmark keeps working.
     hub_links_local: dict[str, str] = {'hub':'http://localhost:3180/','library':'http://localhost:3001/reader','prep':'http://localhost:3188/'}
-    hub_links_public: dict[str, str] = {'hub':'https://hub.bagala.ai/','library':'https://library.bagala.ai/reader','prep':'https://prep.bagala.ai/'}
+    hub_links_public: dict[str, str] = {'hub':'https://hub.bagala.ai/','library':'https://library.bagala.ai/reader','prep':'https://bagala.ai/jobprep/'}
     # Session cookie: '' keeps host-only cookies; 'bagala.ai' shares the cookie across *.bagala.ai hosts.
     cookie_domain: str = ''
     cookie_samesite: Literal['lax','strict','none'] = 'lax'
@@ -39,7 +41,9 @@ class Settings(BaseSettings):
     secure_cookies: bool | None = None
     session_hours: int = 8
     signup_enabled: bool = False
-    signup_default_roles: Annotated[list[str], NoDecode] = ['viewer']
+    # A new account is a member: viewer alone cannot open Job Prep (it asks for member or above),
+    # so self-service sign-ups could reach only Job Search and the Library (16 Sep 2026).
+    signup_default_roles: Annotated[list[str], NoDecode] = ['member']
     mail_transport: Literal['log','resend'] = 'log'
     mail_from: str = 'Bagala <no-reply@bagala.ai>'
     resend_api_key_file: str = '/run/secrets/resend/api.key'
