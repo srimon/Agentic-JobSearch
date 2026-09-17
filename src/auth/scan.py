@@ -13,7 +13,6 @@ never appear in logs or audit records. Nothing here changes what the sign-up for
 form stays as enumeration-safe as before.
 """
 import hashlib
-import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Request
@@ -30,7 +29,6 @@ from src.auth.consent import Choice as ConsentChoice, as_choice, record as recor
 # A scanned attempt may still complete its sign-up this long after it was made: the QR code
 # itself is only valid for signup_scan_seconds, the form may take longer to fill in.
 COMPLETION_MINUTES = 30
-E164 = re.compile(r'\+[1-9][0-9]{7,14}')
 RETRY_LATER = HTTPException(429, 'Too many requests. Try again later.', headers={'Retry-After': '900'})
 EXPIRED = 'This code has expired. Ask for a new one on your computer.'
 
@@ -48,7 +46,6 @@ class Scan(BaseModel):
     language: str | None = Field(default=None, max_length=32)
     timezone: str | None = Field(default=None, max_length=64)
     consent: ConsentChoice | None = None
-    phone: str = Field(default='', max_length=40)
 
 
 def client_hash(values):
@@ -56,19 +53,12 @@ def client_hash(values):
 
 
 def scan_url(request, raw):
-    """The address the phone opens: the public one when the form was reached through the edge."""
+    """The address the phone opens: the confirm page of the hub's account screen when the form was
+    reached through the public edge (the screen is served only there), else this product's own page."""
     cfg = settings()
-    origin = cfg.public_origin if on_cookie_domain(request) else cfg.origin
-    return origin.rstrip('/') + '/?scan=' + raw
-
-
-def phone_number(value):
-    digits = re.sub(r'[\s().-]', '', value or '')
-    if not digits:
-        return None
-    if not E164.fullmatch(digits):
-        raise HTTPException(422, 'Enter the number in international form, for example +14155550123.')
-    return digits
+    if on_cookie_domain(request) and cfg.account_screen:
+        return cfg.account_screen.rstrip('/') + '/confirm?scan=' + raw
+    return cfg.origin.rstrip('/') + '/?scan=' + raw
 
 
 def enabled():
@@ -149,9 +139,7 @@ def create_router():
         scanned only for a handheld device with a touch screen."""
         if not enabled():
             raise HTTPException(404, 'Not Found')
-        cfg = settings()
         seen = context.visitor(request)
-        number = phone_number(body.phone) if cfg.phone_collection_enabled else None
         outcome = 'expired'
         handheld = False
         with connection() as conn:
@@ -164,7 +152,7 @@ def create_router():
                 if row:
                     values = dict(seen, screen_width=body.screen_width, screen_height=body.screen_height, pixel_ratio=body.pixel_ratio,
                                   touch_points=body.touch_points, language=context.clip(body.language, 32),
-                                  client_timezone=context.clip(body.timezone, 64), phone_e164=number,
+                                  client_timezone=context.clip(body.timezone, 64),
                                   scan_seconds=(datetime.now(timezone.utc) - row['created_at']).total_seconds(),
                                   same_network=(seen['ip'] == str(row['ip'])) if seen['ip'] and row['ip'] else None)
                     handheld = values['device_class'] in ('phone', 'tablet') and (body.touch_points or 0) > 0

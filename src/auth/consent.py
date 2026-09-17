@@ -20,14 +20,16 @@ from psycopg.types.json import Jsonb
 from src.db.store import connection, audit
 from src.auth.context import visitor, regime
 
-VERSION = '2026-09-17'
-PURPOSES = ('analytics', 'partners', 'advertising')
+# 2026-09-17b: the owner's decision of that evening added news as a fourth purpose; the first version had three.
+VERSION = '2026-09-17b'
+PURPOSES = ('analytics', 'partners', 'advertising', 'news')
 NOTICE = {
     'intro': 'Beyond running the service, may we use details about you and how you use Bagala for the following? '
              'You can change each choice at any time under Account.',
     'analytics': 'Analytics profiling: combine your sign-up details, location and usage into profiles that help us understand who uses Bagala.',
     'partners': 'Partners: share those profiles with selected partners.',
     'advertising': 'Advertising: use them to choose advertising for you.',
+    'news': 'News: send you occasional news about Bagala products by email.',
     'opt_in': 'These are off unless you turn them on.',
     'opt_out': 'These are on unless you turn them off.',
 }
@@ -41,6 +43,7 @@ class Choice(BaseModel):
     analytics: bool = False
     partners: bool = False
     advertising: bool = False
+    news: bool = False
 
 
 def defaults(request):
@@ -61,15 +64,16 @@ def as_choice(value):
 def record(conn, user_id, choice, source, regime_name, ip=None, country=None):
     """Store a choice as the current state and as an event; returns the current row."""
     choice = as_choice(choice)
-    conn.execute("""INSERT INTO jobsearch.consent_events(user_id,source,notice_version,notice_hash,regime,analytics,partners,advertising,ip,country)
-                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
-                 (user_id, source, VERSION, notice_hash(), regime_name, choice['analytics'], choice['partners'], choice['advertising'], ip, country))
-    return conn.execute("""INSERT INTO jobsearch.user_consent(user_id,analytics,partners,advertising,notice_version,regime,updated_at)
-                           VALUES(%s,%s,%s,%s,%s,%s,now())
+    flags = [choice[purpose] for purpose in PURPOSES]
+    conn.execute("""INSERT INTO jobsearch.consent_events(user_id,source,notice_version,notice_hash,regime,analytics,partners,advertising,news,ip,country)
+                    VALUES(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)""",
+                 (user_id, source, VERSION, notice_hash(), regime_name, *flags, ip, country))
+    return conn.execute("""INSERT INTO jobsearch.user_consent(user_id,analytics,partners,advertising,news,notice_version,regime,updated_at)
+                           VALUES(%s,%s,%s,%s,%s,%s,%s,now())
                            ON CONFLICT(user_id) DO UPDATE SET analytics=EXCLUDED.analytics,partners=EXCLUDED.partners,
-                             advertising=EXCLUDED.advertising,notice_version=EXCLUDED.notice_version,regime=EXCLUDED.regime,updated_at=now()
+                             advertising=EXCLUDED.advertising,news=EXCLUDED.news,notice_version=EXCLUDED.notice_version,regime=EXCLUDED.regime,updated_at=now()
                            RETURNING *""",
-                        (user_id, choice['analytics'], choice['partners'], choice['advertising'], VERSION, regime_name)).fetchone()
+                        (user_id, *flags, VERSION, regime_name)).fetchone()
 
 
 def current(conn, user_id):

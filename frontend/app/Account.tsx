@@ -113,7 +113,7 @@ export default function Account({user,version,onSessionChange}:{user:User;versio
     <div className="account-actions"><button className="primary" disabled={!!busy}>{busy==='password'?'Updating…':'Change password'}</button></div>
    </form></section>
 
-  <section className="account-panel" aria-labelledby="account-mfa"><h2 id="account-mfa"><ShieldCheck size={20}/>Two-step sign-in</h2><p>Add a code from an authenticator app (such as Google Authenticator, Microsoft Authenticator or 1Password) to your password when you sign in.</p>
+  <section className="account-panel" aria-labelledby="account-mfa"><h2 id="account-mfa"><ShieldCheck size={20}/>Two-step sign-in</h2><p>Add a code from Microsoft Authenticator, or any authenticator app, to your password when you sign in. Without an app, sign-in can ask for a code sent to your email, or for approval from a phone that is already signed in.</p>
    {mfa===undefined?<p className="muted">Loading…</p>:mfa===null?<p className="muted">Two-step sign-in settings are not available right now.</p>:<>
     <div className="account-actions">{mfa.enabled?<span className="verified"><CircleCheck size={14}/>On</span>:<span className="verified pending"><TriangleAlert size={14}/>Off</span>}{mfa.enabled&&<span className="muted">{mfa.recovery_codes_remaining} of 10 recovery codes left</span>}</div>
     <Notice note={mfaNote}/>
@@ -143,12 +143,12 @@ export default function Account({user,version,onSessionChange}:{user:User;versio
   {setupStep!=='closed'&&<Dialog labelledBy="mfa-setup-title" onClose={closeSetup}>
    <span className="eyebrow">TWO-STEP SIGN-IN</span><h2 id="mfa-setup-title">{setupStep==='password'?'Confirm your password':'Connect your authenticator app'}</h2>
    {setupStep==='password'?<form className="account-form" onSubmit={startSetup}>
-    <p>Enter your password to start. You will need an authenticator app on your phone.</p>
+    <p>Enter your password to start. You will need Microsoft Authenticator, or any authenticator app, on your phone.</p>
     <label>Password<input type="password" required autoComplete="current-password" maxLength={128} value={setupPassword} onChange={e=>setSetupPassword(e.target.value)}/></label>
     <Notice note={setupNote}/>
     <div className="account-actions"><button className="primary" disabled={!!busy}>{busy==='mfa-setup'?'Checking…':'Continue'}</button><button type="button" className="secondary" disabled={!!busy} onClick={closeSetup}>Cancel</button></div>
    </form>:setup&&<form className="account-form" onSubmit={confirmSetup}>
-    <p>{setup.qr_svg?'Scan this QR code with your authenticator app, or enter the setup key by hand.':'Add a new account in your authenticator app and enter this setup key by hand.'}</p>
+    <p>{setup.qr_svg?'Scan this QR code with Microsoft Authenticator (or your authenticator app), or enter the setup key by hand.':'Add a new account in Microsoft Authenticator (or your authenticator app) and enter this setup key by hand.'}</p>
     {setup.qr_svg&&<img className="mfa-qr" src={'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(setup.qr_svg)} alt="QR code to add Bagala to your authenticator app" width={200} height={200}/>}
     <div><span className="muted">Setup key</span><br/><code className="mfa-secret">{(setup.secret.match(/.{1,4}/g)||[]).join(' ')}</code></div>
     <div className="account-actions"><CopyButton value={setup.secret} label="Copy key"/><span className="muted">Account: Bagala, time-based, 6 digits.</span></div>

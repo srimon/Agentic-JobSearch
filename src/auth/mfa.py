@@ -21,7 +21,7 @@ MAX_CHALLENGE_ATTEMPTS = 5
 MAX_RESENDS = 2
 RETRY_LATER = HTTPException(429, 'Too many attempts. Try again later.', headers={'Retry-After': '900'})
 UNAVAILABLE = HTTPException(503, 'Two-step sign-in is not available right now.')
-WRONG_CODE = 'That code did not work. Check your authenticator app and try again.'
+WRONG_CODE = 'That code did not work. Check Microsoft Authenticator (or your authenticator app) and try again.'
 EXPIRED = 'Your sign-in attempt expired. Enter your password again.'
 
 

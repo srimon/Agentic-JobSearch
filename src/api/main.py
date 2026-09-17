@@ -165,7 +165,8 @@ def session(request:Request):
     return {'user': {'name':user['display_name'],'roles':user['roles']} if user else None,
             'identity_ready':True,'provider':'Local',
             'features':{'data_management':cfg.data_management_enabled,'maintenance':cfg.maintenance_mode,
-                        'signup_scan':cfg.signup_enabled and cfg.signup_scan_enabled,'phone_collection':cfg.phone_collection_enabled},
+                        'signup_scan':cfg.signup_enabled and cfg.signup_scan_enabled,'signin_scan':cfg.login_scan_approval,
+                        'email_code':cfg.login_email_code},
             'idle_minutes':idle_minutes_for(user) if user else 0,
             'links':cfg.hub_links_public if on_cookie_domain(request) else cfg.hub_links_local,'signup_enabled':cfg.signup_enabled,
             'consent':consent_defaults(request)}
@@ -192,6 +193,8 @@ from src.auth.scan import create_router as scan_router
 app.include_router(scan_router())
 from src.auth.consent import create_router as consent_router, defaults as consent_defaults
 app.include_router(consent_router(current_user))
+from src.auth.approve import create_router as approve_router
+app.include_router(approve_router(current_user))
 
 
 @app.get('/api/hub/prep-identity')

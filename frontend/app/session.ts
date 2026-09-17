@@ -5,12 +5,12 @@ import {withBase} from './paths';
 export type User={name:string;roles:string[]};
 export type Links={hub?:string;library?:string;prep?:string;governance?:string;clickhouse?:string};
 /** The consent notice (src/auth/consent.py NOTICE) and the three purposes it asks about. */
-export type ConsentNotice={intro:string;analytics:string;partners:string;advertising:string;opt_in:string;opt_out:string};
-export type ConsentChoice={analytics:boolean;partners:boolean;advertising:boolean};
+export type ConsentNotice={intro:string;analytics:string;partners:string;advertising:string;news:string;opt_in:string;opt_out:string};
+export type ConsentChoice={analytics:boolean;partners:boolean;advertising:boolean;news:boolean};
 /** What /api/session says about consent for this visitor: the regime their location puts them under and the default that follows. */
 export type ConsentDefaults={regime:string;opt_in_required:boolean;version:string;notice:ConsentNotice;default:ConsentChoice};
 export type Session={user:User|null;identity_ready?:boolean;signup_enabled?:boolean;idle_minutes?:number;links?:Partial<Record<string,unknown>>|null;
- features?:{data_management?:boolean;maintenance?:boolean;signup_scan?:boolean;phone_collection?:boolean};consent?:ConsentDefaults};
+ features?:{data_management?:boolean;maintenance?:boolean;signup_scan?:boolean;signin_scan?:boolean;email_code?:boolean};consent?:ConsentDefaults};
 
 /**
  * When this browser last asked the account service for something.

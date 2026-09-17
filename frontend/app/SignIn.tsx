@@ -33,7 +33,7 @@ export default function SignIn({session,notice='',onSession}:{session:Session|nu
  const [consent,setConsent]=useState<ConsentChoice>(NO_CONSENT),[consentTouched,setConsentTouched]=useState(false);
  const [website,setWebsite]=useState('');
  // The phone's side of the phone-scan check (?scan=...): the secret from the code, the report and its outcome.
- const [scanToken,setScanToken]=useState(''),[scanState,setScanState]=useState<'form'|'done'|'not-phone'>('form'),[scanMessage,setScanMessage]=useState(''),[phone,setPhone]=useState('');
+ const [scanToken,setScanToken]=useState(''),[scanState,setScanState]=useState<'form'|'done'|'not-phone'>('form'),[scanMessage,setScanMessage]=useState('');
  const scanEnabled=session?.features?.signup_scan===true;
 
  useEffect(()=>{
@@ -93,7 +93,7 @@ export default function SignIn({session,notice='',onSession}:{session:Session|nu
   try{await api('/auth/mfa/verify',{method:'POST',body:JSON.stringify(useRecovery?{recovery_code:value}:{code:value})});setCode('');await finishSignIn()}
   catch(err){setCode('');
    if(err instanceof ApiError&&err.status===400){go('signin');setError('Your sign-in attempt expired. Enter your password again.')}
-   else fail(err,{401:useRecovery?'That recovery code did not work. Check it and try again.':method==='email'?'That code did not work. Check the newest email we sent and try again.':'That code did not work. Check your authenticator app and try again.'});
+   else fail(err,{401:useRecovery?'That recovery code did not work. Check it and try again.':method==='email'?'That code did not work. Check the newest email we sent and try again.':'That code did not work. Check Microsoft Authenticator (or your authenticator app) and try again.'});
   }finally{setBusy(false)}}
 
  async function resendCode(){if(busy||cooldown>0)return;setBusy(true);setError('');
@@ -119,9 +119,9 @@ export default function SignIn({session,notice='',onSession}:{session:Session|nu
   try{const result=await api<{ok:boolean;handheld:boolean;message:string}>('/auth/signup/scan',{method:'POST',body:JSON.stringify({
     scan:scanToken,screen_width:window.screen.width,screen_height:window.screen.height,pixel_ratio:window.devicePixelRatio,
     touch_points:navigator.maxTouchPoints,language:navigator.language,timezone:Intl.DateTimeFormat().resolvedOptions().timeZone,
-    consent:session?.consent?consent:undefined,phone:phone.trim()})});
+    consent:session?.consent?consent:undefined})});
    setScanMessage(result.message);setScanState(result.handheld?'done':'not-phone')}
-  catch(err){fail(err,{400:'This code has expired. Ask for a new one on your computer.',422:'Enter the phone number in international form, for example +14155550123.'})}
+  catch(err){fail(err,{400:'This code has expired. Ask for a new one on your computer.'})}
   finally{setBusy(false)}}
 
  async function requestReset(e:FormEvent){e.preventDefault();setBusy(true);setError('');
@@ -143,7 +143,7 @@ export default function SignIn({session,notice='',onSession}:{session:Session|nu
  function heading():{icon:ReactNode;eyebrow:string;title:ReactNode;text:string}{
   const shield=<ShieldCheck size={32}/>;
   switch(mode){
-   case 'mfa':return {icon:<KeyRound size={32}/>,eyebrow:'TWO-STEP SIGN-IN',title:<>Confirm it is you.</>,text:useRecovery?'Enter one of the recovery codes you saved when you turned on two-step sign-in. Each code works once.':method==='email'?'Enter the 6-digit code we just emailed to you. It works once and expires in 5 minutes.':'Enter the 6-digit code from your authenticator app.'};
+   case 'mfa':return {icon:<KeyRound size={32}/>,eyebrow:'TWO-STEP SIGN-IN',title:<>Confirm it is you.</>,text:useRecovery?'Enter one of the recovery codes you saved when you turned on two-step sign-in. Each code works once.':method==='email'?'Enter the 6-digit code we just emailed to you. It works once and expires in 5 minutes.':'Enter the 6-digit code from Microsoft Authenticator or any authenticator app.'};
    case 'signup':return {icon:shield,eyebrow:'CREATE YOUR ACCOUNT',title:<>Start your<br/>private search.</>,text:'One Bagala account signs you in to Job Search, Job Prep and Library. We will email you a link to verify your address.'};
    case 'scan':return scanState==='done'?{icon:<CircleCheck size={32}/>,eyebrow:'SIGN-UP CONFIRMED',title:<>Thank you.</>,text:scanMessage||'Go back to your computer to finish creating your account.'}:scanState==='not-phone'?{icon:<TriangleAlert size={32}/>,eyebrow:'NOT A PHONE',title:<>Use your phone.</>,text:scanMessage||'Scan the code with a phone camera to confirm your sign-up.'}:{icon:<Smartphone size={32}/>,eyebrow:'CONFIRM YOUR SIGN-UP',title:<>Confirm it is you.</>,text:'You scanned the code on your computer. Confirm here, then finish creating your account there.'};
    case 'forgot':return {icon:<KeyRound size={32}/>,eyebrow:'RESET YOUR PASSWORD',title:<>Forgot your<br/>password?</>,text:'Enter the email on your account and we will send you a link to choose a new password.'};
@@ -187,7 +187,7 @@ export default function SignIn({session,notice='',onSession}:{session:Session|nu
    <button className="primary" disabled={locked||!code}>{busy?'Checking…':'Continue'}</button>
    {method==='email'
     ?<div className="signin-links"><button type="button" className="link-button" disabled={locked} onClick={resendCode}>Send a new code</button>{backToSignIn}</div>
-    :<div className="signin-links"><button type="button" className="link-button" onClick={()=>{setUseRecovery(r=>!r);setCode('');setError('')}}>{useRecovery?'Use your authenticator app instead':'Use a recovery code instead'}</button>{backToSignIn}</div>}
+    :<div className="signin-links"><button type="button" className="link-button" onClick={()=>{setUseRecovery(r=>!r);setCode('');setError('')}}>{useRecovery?'Use Microsoft Authenticator or your app instead':'Use a recovery code instead'}</button>{backToSignIn}</div>}
    <p className="hint">{method==='email'?'The code goes to the email address on your account. No authenticator app is needed.':'Lost your phone and your recovery codes? Contact your administrator to turn off two-step sign-in.'}</p>
   </form>}
 
@@ -212,7 +212,6 @@ export default function SignIn({session,notice='',onSession}:{session:Session|nu
   {mode==='scan'&&(scanState!=='form'?<div className="login-form">{scanState==='not-phone'&&<button type="button" className="secondary" onClick={()=>{setScanState('form');setError('')}}>Try again</button>}</div>:
    <form className="login-form" onSubmit={confirmScan}>
     {session?.consent&&<ConsentChoices notice={session.consent.notice} optInRequired={session.consent.opt_in_required} value={consent} onChange={v=>{setConsent(v);setConsentTouched(true)}} disabled={locked}/>}
-    {session?.features?.phone_collection&&<label>Phone number (optional)<input type="tel" autoComplete="tel" inputMode="tel" maxLength={40} placeholder="+14155550123" value={phone} onChange={e=>setPhone(e.target.value)}/><span className="hint">International form. We will confirm it by text message once that is available.</span></label>}
     {errorLine}
     <button className="primary" disabled={locked||!scanToken}>{busy?'Confirming…':'Confirm'}</button>
     <p className="hint">This records that a phone confirmed the sign-up, with its screen, language and network details, against the new account.</p>

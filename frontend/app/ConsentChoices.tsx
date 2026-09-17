@@ -1,8 +1,8 @@
 'use client';
 import type {ConsentChoice,ConsentNotice} from './session';
 
-export const PURPOSES:(keyof ConsentChoice)[]=['analytics','partners','advertising'];
-export const NO_CONSENT:ConsentChoice={analytics:false,partners:false,advertising:false};
+export const PURPOSES:(keyof ConsentChoice)[]=['analytics','partners','advertising','news'];
+export const NO_CONSENT:ConsentChoice={analytics:false,partners:false,advertising:false,news:false};
 
 /**
  * The consent notice and its three choices, word for word as the account service sends them
