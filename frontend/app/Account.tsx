@@ -1,6 +1,6 @@
 'use client';
 import {useEffect,useState,type FormEvent} from 'react';
-import {CircleCheck,TriangleAlert,LogOut,MailCheck,KeyRound,MonitorSmartphone,UserRound,ShieldCheck,Copy,SlidersHorizontal} from 'lucide-react';
+import {CircleCheck,TriangleAlert,LogOut,MailCheck,KeyRound,MonitorSmartphone,UserRound,ShieldCheck,Copy,SlidersHorizontal,Terminal} from 'lucide-react';
 import {api,describeError,signOutToSignIn,type User,type ConsentChoice,type ConsentNotice} from './session';
 import ConsentChoices,{NO_CONSENT} from './ConsentChoices';
 import Dialog from './Dialog';
@@ -11,6 +11,10 @@ type ConsentRead={choices:ConsentChoice;version:string|null;regime:string|null;u
 type MfaStatus={enabled:boolean;recovery_codes_remaining:number};
 type MfaSetup={secret:string;otpauth_uri:string;qr_svg?:string|null};
 type SessionRow={created_at:string;expires_at:string;current:boolean};
+/** GET /api/auth/keys: this account's API keys (never a secret) and the limits that apply to them. */
+type ApiKey={id:string;name:string;products:string[];daily_quota:number;created_at:string;last_used_at:string|null;revoked_at:string|null;used_today:number};
+type KeyList={keys:ApiKey[];products:string[];daily_quota_max:number;limit:number;api_base:string;limit_class:string};
+const PRODUCT_LABELS:Record<string,string>={jobsearch:'Job Search',library:'Library',prep:'Job Prep'};
 type Note={kind:'ok'|'error';text:string}|null;
 const when=(value?:string|null)=>value?new Date(value).toLocaleString():'Unknown';
 function Notice({note}:{note:Note}){return note?<p className={'message'+(note.kind==='error'?' error':'')} role={note.kind==='error'?'alert':'status'}>{note.text}</p>:null}
@@ -33,8 +37,14 @@ export default function Account({user,version,onSessionChange}:{user:User;versio
  const [recoveryCodes,setRecoveryCodes]=useState<string[]|null>(null);
  const [mfaForm,setMfaForm]=useState<'none'|'off'|'codes'>('none'),[offPassword,setOffPassword]=useState(''),[mfaCode,setMfaCode]=useState('');
  const [consentState,setConsentState]=useState<ConsentRead|null|undefined>(undefined),[consentChoice,setConsentChoice]=useState<ConsentChoice>(NO_CONSENT),[consentNote,setConsentNote]=useState<Note>(null);
+ // API keys: the list, the create form (name, products, the password again), the one-time reveal, an inline rename and a revoke to confirm.
+ const [keyList,setKeyList]=useState<KeyList|null|undefined>(undefined),[keyNote,setKeyNote]=useState<Note>(null);
+ const [keyForm,setKeyForm]=useState(false),[keyName,setKeyName]=useState(''),[keyPassword,setKeyPassword]=useState(''),[keyProducts,setKeyProducts]=useState<string[]>([]);
+ const [newKey,setNewKey]=useState<{name:string;key:string}|null>(null);
+ const [renaming,setRenaming]=useState<{id:string;name:string}|null>(null),[revoking,setRevoking]=useState<string|null>(null);
 
  useEffect(()=>{let active=true;setLoadNote(null);
+  api<KeyList>('/auth/keys').then(list=>{if(!active)return;setKeyList(list);setKeyProducts(list.products)}).catch(()=>{if(active)setKeyList(null)});
   api<Profile>('/auth/profile').then(p=>{if(!active)return;setProfile(p);setDisplayName(p.display_name||'');setEmail(p.email||'')}).catch(e=>{if(active)setLoadNote({kind:'error',text:describeError(e,{404:'Profile details are not available on this server yet.'})})});
   api<SessionRow[]>('/auth/sessions').then(rows=>{if(active)setSessions(Array.isArray(rows)?rows:[])}).catch(()=>{if(active)setSessions(null)});
   api<MfaStatus>('/auth/mfa').then(s=>{if(active)setMfa(s)}).catch(()=>{if(active)setMfa(null)});
@@ -90,6 +100,19 @@ export default function Account({user,version,onSessionChange}:{user:User;versio
    text=>{setMfaCode('');setMfaNote({kind:'error',text})},{400:'That code did not work. Try the newest code from your app.'})}
 
  function signOut(){run('signout',signOutToSignIn,text=>setSessionNote({kind:'error',text}))}
+
+ function toggleProduct(product:string){setKeyProducts(p=>p.includes(product)?p.filter(x=>x!==product):[...p,product])}
+ function createKey(e:FormEvent){e.preventDefault();setKeyNote(null);
+  if(!keyProducts.length){setKeyNote({kind:'error',text:'Choose at least one product for the key.'});return}
+  run('key-create',async()=>{const made=await api<ApiKey&{key:string}>('/auth/keys',{method:'POST',body:JSON.stringify({name:keyName.trim(),password:keyPassword,products:keyProducts})});
+   setKeyPassword('');setKeyName('');setKeyForm(false);setNewKey({name:made.name,key:made.key});setReload(r=>r+1)},
+   text=>setKeyNote({kind:'error',text}),{400:'That password is not right.',409:'You already have a key with that name, or you have reached the limit of active keys.'})}
+ function renameKey(e:FormEvent){e.preventDefault();if(!renaming)return;setKeyNote(null);
+  const target=renaming;
+  run('key-rename',async()=>{await api('/auth/keys/'+encodeURIComponent(target.id),{method:'PATCH',body:JSON.stringify({name:target.name.trim()})});setRenaming(null);setKeyNote({kind:'ok',text:'Key renamed.'});setReload(r=>r+1)},
+   text=>setKeyNote({kind:'error',text}),{409:'You already have a key with that name.'})}
+ function revokeKey(id:string){setKeyNote(null);
+  run('key-revoke',async()=>{await api('/auth/keys/'+encodeURIComponent(id),{method:'DELETE'});setRevoking(null);setKeyNote({kind:'ok',text:'Key revoked. Programs using it are refused from now on.'});setReload(r=>r+1)},text=>setKeyNote({kind:'error',text}))}
 
  const roles=profile?.roles||user.roles;
  return <div className="account">
@@ -163,6 +186,32 @@ export default function Account({user,version,onSessionChange}:{user:User;versio
    <p>If you lose your phone, each of these codes signs you in once instead of an app code. Save them now in a password manager or print them. This is the only time they are shown.</p>
    <ul className="recovery-codes">{recoveryCodes.map(c=><li key={c}><code>{c}</code></li>)}</ul>
    <div className="account-actions"><CopyButton value={recoveryCodes.join('\n')} label="Copy codes"/><button type="button" className="primary" onClick={()=>setRecoveryCodes(null)}>I have saved them</button></div>
+  </Dialog>}
+
+  <section className="account-panel" aria-labelledby="account-keys"><h2 id="account-keys"><Terminal size={20}/>API keys</h2><p>Let a program use Bagala as you. A key carries your roles, counts against a daily call limit, can be revoked at any time and is shown once, when it is created. Keys cannot change your account.</p>
+   {keyList===undefined?<p className="muted">Loading…</p>:keyList===null?<p className="muted">API keys are not available on this server.</p>:<>
+    {keyList.api_base&&<p className="muted">Send it as <code>Authorization: Bearer &lt;key&gt;</code> to <code>{keyList.api_base}/&lt;product&gt;/…</code> (products: {keyList.products.join(', ')}). Your keys are in the {keyList.limit_class} rate class; up to {keyList.daily_quota_max} calls a day each, {keyList.limit} active keys at most.</p>}
+    <div className="table-wrap"><table><thead><tr><th>Name</th><th>Id</th><th>Products</th><th>Today</th><th>Last used</th><th>Status</th><th/></tr></thead><tbody>{keyList.keys.map(k=><tr key={k.id}>
+     <td>{renaming?.id===k.id?<form className="account-actions" onSubmit={renameKey}><input required maxLength={60} aria-label="New name" value={renaming.name} onChange={e=>setRenaming({id:k.id,name:e.target.value})}/><button className="primary" disabled={!!busy}>{busy==='key-rename'?'Saving…':'Save'}</button><button type="button" className="secondary" disabled={!!busy} onClick={()=>setRenaming(null)}>Cancel</button></form>:<strong>{k.name}</strong>}</td>
+     <td><code>{k.id}</code></td><td>{k.products.map(p=>PRODUCT_LABELS[p]||p).join(', ')}</td><td>{k.used_today}{k.daily_quota?' / '+k.daily_quota:''}</td><td>{k.last_used_at?when(k.last_used_at):'Never'}</td>
+     <td><span className={'badge'+(k.revoked_at?' warning':'')}>{k.revoked_at?'Revoked '+when(k.revoked_at):'Active'}</span></td>
+     <td>{!k.revoked_at&&(revoking===k.id?<span className="account-actions"><button type="button" className="secondary danger" disabled={!!busy} onClick={()=>revokeKey(k.id)}>{busy==='key-revoke'?'Revoking…':'Confirm'}</button><button type="button" className="secondary" disabled={!!busy} onClick={()=>setRevoking(null)}>Cancel</button></span>:<span className="account-actions"><button type="button" className="secondary" disabled={!!busy} onClick={()=>{setRenaming({id:k.id,name:k.name});setRevoking(null)}}>Rename</button><button type="button" className="secondary danger" disabled={!!busy} onClick={()=>{setRevoking(k.id);setRenaming(null)}}>Revoke</button></span>)}</td>
+    </tr>)}</tbody></table>{!keyList.keys.length&&<div className="empty">No API keys yet.</div>}</div>
+    <Notice note={keyNote}/>
+    {keyForm?<form className="account-form" onSubmit={createKey}>
+     <label>Key name<input required maxLength={60} autoComplete="off" placeholder="laptop script" value={keyName} onChange={e=>setKeyName(e.target.value)}/></label>
+     <div className="account-actions">{keyList.products.map(p=><label key={p} className="account-actions"><input type="checkbox" checked={keyProducts.includes(p)} onChange={()=>toggleProduct(p)}/>{PRODUCT_LABELS[p]||p}</label>)}</div>
+     <label>Your password<input type="password" required autoComplete="current-password" maxLength={128} value={keyPassword} onChange={e=>setKeyPassword(e.target.value)}/></label>
+     <div className="account-actions"><button className="primary" disabled={!!busy}>{busy==='key-create'?'Creating…':'Create key'}</button><button type="button" className="secondary" disabled={!!busy} onClick={()=>{setKeyForm(false);setKeyPassword('')}}>Cancel</button></div>
+    </form>:<div className="account-actions"><button type="button" className="primary" disabled={!!busy} onClick={()=>{setKeyForm(true);setKeyNote(null);setKeyProducts(keyList.products)}}>Create a key</button></div>}
+   </>}
+  </section>
+
+  {newKey&&<Dialog labelledBy="new-key-title" onClose={()=>setNewKey(null)}>
+   <span className="eyebrow">SAVE IT NOW</span><h2 id="new-key-title">Your new key: {newKey.name}</h2>
+   <p>This is the only time the key is shown. Store it in a password manager or your program&apos;s secret store; if you lose it, revoke it and create another.</p>
+   <code className="mfa-secret">{newKey.key}</code>
+   <div className="account-actions"><CopyButton value={newKey.key} label="Copy key"/><button type="button" className="primary" onClick={()=>setNewKey(null)}>I have saved it</button></div>
   </Dialog>}
 
   <section className="account-panel" aria-labelledby="account-sessions"><h2 id="account-sessions"><MonitorSmartphone size={20}/>Signed-in devices</h2><p>Every active session for your account.</p>

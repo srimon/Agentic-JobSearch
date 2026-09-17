@@ -101,6 +101,14 @@ class Settings(BaseSettings):
     # after context_address_retention_months by scripts/context_purge.py, the rest of the row kept.
     context_signin_retention_days: int = Field(default=365, ge=1, le=3650)
     context_address_retention_months: int = Field(default=12, ge=1, le=120)
+    # API keys (stage 2 of the hub's docs/plans/api-gateway-and-mcp.md; src/auth/api_keys.py). Off by
+    # default, so the image alone changes nothing until JOBSEARCH_API_KEYS_ENABLED=true is rolled through
+    # the ConfigMap; off again is the rollback (keys refused, everything else as before).
+    api_keys_enabled: bool = False
+    # Calls per key per UTC day: the ceiling a key may be given at creation, and its default. 0 = unlimited.
+    api_key_daily_quota: int = Field(default=1000, ge=0)
+    # Active (unrevoked) keys one account may hold.
+    api_keys_per_account: int = Field(default=10, ge=1, le=100)
     mail_transport: Literal['log','resend'] = 'log'
     mail_from: str = 'Bagala <no-reply@bagala.ai>'
     resend_api_key_file: str = '/run/secrets/resend/api.key'

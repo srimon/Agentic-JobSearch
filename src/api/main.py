@@ -17,6 +17,7 @@ from src.applications.archives import archive_for,require_active,archive_if_emai
 from ai_core.agents.supervisor import enqueue
 from src.applications.learning import current as learning_model,explain as learning_explain,configure as configure_learning,ranking_sql
 from src.applications.job_filters import STATE_VALUES,TITLE_VALUES,facet_summary
+from src.auth import api_keys
 
 cfg=settings()
 
@@ -52,7 +53,12 @@ async def boundaries(request,call_next):
     if cfg.maintenance_mode and request.method not in ('GET','HEAD','OPTIONS') and request.url.path not in ('/api/auth/login','/api/auth/logout','/api/auth/mfa/verify') and not request.url.path.startswith('/api/monitoring/'):
         return JSONResponse({'detail':'Maintenance mode: changes are temporarily disabled.'},status_code=503,headers={'Retry-After':'300','Cache-Control':'no-store'})
     if request.method in ('POST','PUT','PATCH','DELETE'):
-        if request.headers.get('origin') not in cfg.allowed_origins:
+        # The Origin check is against a browser's ambient cookie. An API key is not ambient: a browser cannot
+        # attach an Authorization header cross-site without a preflight this API never answers, so a keyed
+        # request that carries no cookie needs no Origin (src/auth/api_keys.py); one that carries both is
+        # refused by current_user, and an invalid key is refused there too.
+        keyed_request=bool(api_keys.bearer(request)) and not request.cookies.get('jobsearch_session')
+        if not keyed_request and request.headers.get('origin') not in cfg.allowed_origins:
             return JSONResponse({'detail':'Origin rejected'},status_code=403)
     limit=5*1024*1024 if request.method=='PUT' and request.url.path in ('/api/intake/resume/default','/api/intake/resume/capital_one') else 65536
     if request.headers.get('content-length','').isdigit() and int(request.headers['content-length'])>limit:
@@ -104,7 +110,12 @@ def current_user(request:Request):
     used for settings.idle_minutes is deleted and refused, so nothing signs in again on a
     session that was abandoned. The stamp that measures it is written back only when it has gone
     stale, so an active session costs one write every ACTIVITY_REFRESH_SECONDS and not one per
-    request."""
+    request.
+
+    A program sends "Authorization: Bearer hub_<id>_<secret>" instead of the cookie (src/auth/api_keys.py):
+    the key resolves to its account with that account's roles, is counted against its daily quota, and is
+    refused when a cookie comes along with it, when it is revoked or when it reaches for the account itself."""
+    if api_keys.bearer(request): return api_keys.authenticate(request)
     token=request.cookies.get('jobsearch_session','')
     if not token: raise HTTPException(401,'Sign in required')
     digest=hashlib.sha256(token.encode()).hexdigest()
@@ -166,7 +177,7 @@ def session(request:Request):
             'identity_ready':True,'provider':'Local',
             'features':{'data_management':cfg.data_management_enabled,'maintenance':cfg.maintenance_mode,
                         'signup_scan':cfg.signup_enabled and cfg.signup_scan_enabled,'signin_scan':cfg.login_scan_approval,
-                        'email_code':cfg.login_email_code},
+                        'email_code':cfg.login_email_code,'api_keys':cfg.api_keys_enabled},
             'idle_minutes':idle_minutes_for(user) if user else 0,
             'links':cfg.hub_links_public if on_cookie_domain(request) else cfg.hub_links_local,'signup_enabled':cfg.signup_enabled,
             'consent':consent_defaults(request)}
@@ -195,10 +206,13 @@ from src.auth.consent import create_router as consent_router, defaults as consen
 app.include_router(consent_router(current_user))
 from src.auth.approve import create_router as approve_router
 app.include_router(approve_router(current_user))
+# API keys: created, renamed and revoked from a signed-in browser session, never with a key.
+app.include_router(api_keys.create_router(current_user))
 
 
 @app.get('/api/hub/prep-identity')
 def prep_identity(user=Depends(current_user)):
+    # A session cookie or an API key (current_user resolves both; a key must cover the prep product).
     if not set(user['roles']) & {'member','operator','administrator'}: raise HTTPException(403,'Member role required')
     return {'subject':'jobsearch:'+str(user['id']),'name':user['display_name'],'roles':user['roles']}
 
