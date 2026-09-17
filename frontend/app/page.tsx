@@ -22,6 +22,7 @@ import Dialog from './Dialog';
 import IdleWatch from './IdleWatch';
 import {BrandHeader,BrandFooter} from './Brand';
 import {isOwnAddress} from './paths';
+import {signedOutLanding} from './account-screen.mjs';
 import {api,type Session,resolveLinks,prepStartUrl,isAdministrator,HubLinksContext,signOutToSignIn,describeError,safeNext,rememberNext,whenSessionEnds,appPath} from './session';
 
 import {CircleCheck,TriangleAlert,Clock3,LockKeyhole,Mail,Archive,Search,Bookmark,ArrowUpRight,MapPin,BriefcaseBusiness,ShieldCheck,Activity,Database,ChevronLeft,ChevronRight,RefreshCw,X,SlidersHorizontal,LogOut,UserRound,ArrowLeft,Gauge} from 'lucide-react';
@@ -71,16 +72,19 @@ export default function Home(){
  const [signingOut,setSigningOut]=useState(false);
  // Why the sign-in card is showing, when it is showing because a session ended rather than
  // because nobody has signed in yet.
- const [endedNotice,setEndedNotice]=useState('');
+ const [endedNotice,setEndedNotice]=useState(''),[endedReason,setEndedReason]=useState<''|'idle'|'ended'>('');
+ // Signed out: on the public site the visitor is sent to the hub's screen (below) and nothing of this page shows;
+ // on the loopback name the card with its form shows ('card').
+ const [landing,setLanding]=useState<'unknown'|'card'>('unknown');
  const idleMinutes=session?.idle_minutes??0;
  // Any refused request lands here: the workspace is replaced by the sign-in card with the
  // reason the account service gave, instead of an error banner over a page that cannot load.
- useEffect(()=>{whenSessionEnds(message=>{setEndedNotice(message);setError('');setDetail(null);setSession(s=>s?{...s,user:null}:s)});return()=>whenSessionEnds(null)},[]);
+ useEffect(()=>{whenSessionEnds(message=>{setEndedNotice(message);setEndedReason('ended');setError('');setDetail(null);setSession(s=>s?{...s,user:null}:s)});return()=>whenSessionEnds(null)},[]);
  // The idle allowance has run out: ask the account service what is left, which is the request
  // that deletes the session row, and show the sign-in card with a plain message.
  async function idleEnded(){
   setEndedNotice('You were signed out after '+idleMinutes+' minute'+(idleMinutes===1?'':'s')+' without activity.');
-  setError('');setDetail(null);
+  setEndedReason('idle');setError('');setDetail(null);
   try{setSession(await api<Session>('/session'))}catch{setSession(s=>s?{...s,user:null}:s)}
  }
  // One sign-out for the header and the sidebar: ends the shared session, then the sign-in screen.
@@ -98,6 +102,18 @@ export default function Home(){
  useEffect(()=>{if(!session?.user)return;const params=new URLSearchParams(window.location.search);const next=safeNext(params.get('next'));if(!next||isOwnAddress(next))return;
   const key='jobsearch-next-bounce:'+next;let recent=false;try{recent=Date.now()-Number(sessionStorage.getItem(key)||0)<60000;sessionStorage.setItem(key,String(Date.now()))}catch{}
   rememberNext(null);if(!recent)window.location.replace(next);else window.history.replaceState(null,'',window.location.pathname)},[session]);
+ // The public hosts have one sign-in screen for every product (the hub's; docs/plans/account-screen.md there), and
+ // the other products' gateways send a signed-out visitor straight to it. This page does the same as soon as the
+ // session check says signed out: to the screen with this page as the return address (query kept), or, for an old
+ // email landing or a phone's code, to the screen's own page with the token (account-screen.mjs). The loopback name
+ // keeps the card with its form. One bounce per minute, so a screen that keeps sending a signed-out visitor back
+ // cannot loop: the card, with its working form, shows instead.
+ useEffect(()=>{if(!session||session.user){setLanding('unknown');return}
+  const target=signedOutLanding(window.location.href,safeNext(new URLSearchParams(window.location.search).get('next')),endedReason);
+  if(!target){setLanding('card');return}
+  const key='jobsearch-signin-bounce';let recent=false;try{recent=Date.now()-Number(sessionStorage.getItem(key)||0)<60000;sessionStorage.setItem(key,String(Date.now()))}catch{}
+  if(recent){setLanding('card');return}
+  rememberNext(null);window.location.replace(target)},[session,endedReason]);
 
  useEffect(()=>{const timer=setTimeout(()=>{setQuery(q);setPage(1)},300);return()=>clearTimeout(timer)},[q]);
 
@@ -174,7 +190,7 @@ export default function Home(){
  <main>
  {session?.features?.maintenance&&<p className="notice" role="status">Scheduled maintenance · Changes to jobs, profiles and applications are temporarily disabled.</p>}
 
- <section className="content"><div key={tab} className="page-heading page-arrival"><div><div className="eyebrow">YOUR NEXT CHAPTER</div><h1>{labels[tab]}</h1><p>{tab==='emailed'?'Work through the jobs in your email reports. Selecting a status saves it immediately, permanently locks the job and moves it to Archive.':tab==='archive'?'Completed decisions are locked. Archived jobs are excluded from future reports.':tab==='sources'?'See where your opportunities come from.':tab==='runs'?'Track source checks and collection outcomes.':tab==='model'?'Explore the PostgreSQL table structure and declared relationships.':tab==='quality'?'Evidence-based checks for this application.':tab==='observability'?'Live metrics and traces, together in your workspace.':tab==='admin'?'Traffic, accounts, conversion and machine load across every Bagala product.':tab==='account'?'Your Bagala account: name, email, password and signed-in devices.':'Find the role where your experience makes a difference.'}</p></div><button className="secondary" disabled={!user||loading} onClick={()=>setVersion(v=>v+1)}><RefreshCw size={16} className={loading?'spin':''}/>Refresh</button></div>
+ <section className="content"><div key={tab} className="page-heading page-arrival"><div><div className="eyebrow">YOUR NEXT CHAPTER</div><h1>{labels[tab]}</h1><p>{tab==='emailed'?'Work through the jobs in your email reports. Selecting a status saves it immediately, permanently locks the job and moves it to Archive.':tab==='archive'?'Completed decisions are locked. Archived jobs are excluded from future reports.':tab==='sources'?'See where your opportunities come from.':tab==='runs'?'Track source checks and collection outcomes.':tab==='model'?'Explore the PostgreSQL table structure and declared relationships.':tab==='quality'?'Evidence-based checks for this application.':tab==='observability'?'Live metrics and traces, together in your workspace.':tab==='admin'?'Traffic, accounts, conversion and machine load across every Bagala product.':tab==='account'?'Your Bagala account: name, email, password, API keys and signed-in devices.':'Find the role where your experience makes a difference.'}</p></div><button className="secondary" disabled={!user||loading} onClick={()=>setVersion(v=>v+1)}><RefreshCw size={16} className={loading?'spin':''}/>Refresh</button></div>
 
  {error&&<div className="message error" role="alert">{error}<button onClick={()=>location.reload()}>Reload</button></div>}
 
@@ -183,7 +199,7 @@ export default function Home(){
  {user&&admin&&!tab.startsWith('data-')&&!['workflow','observability','admin','quality','model','governance','account'].includes(tab)&&<CollectionStatus version={version} date={date}/>}
  {notice&&<div className="message" role="status">{notice}</div>}
 
- {!session&&!error?<div className="empty">Connecting to your workspace…</div>:!user?<><div className="filters preview-filters"><div className="search"><Search size={19}/><input disabled placeholder="Search title or company" aria-label="Search title or company"/></div><label>Date posted<select disabled defaultValue="Past 24 hours"><option>Any time</option><option>Past 24 hours</option><option>Past 7 days</option><option>Past 30 days</option></select></label></div><SignIn session={session} notice={endedNotice} onSession={s=>{setEndedNotice('');setSession(s)}}/></>:
+ {!session&&!error?<div className="empty">Connecting to your workspace…</div>:!user&&landing!=='card'?<div className="empty">Taking you to sign in…</div>:!user?<><div className="filters preview-filters"><div className="search"><Search size={19}/><input disabled placeholder="Search title or company" aria-label="Search title or company"/></div><label>Date posted<select disabled defaultValue="Past 24 hours"><option>Any time</option><option>Past 24 hours</option><option>Past 7 days</option><option>Past 30 days</option></select></label></div><SignIn session={session} notice={endedNotice} onSession={s=>{setEndedNotice('');setSession(s)}}/></>:
 
  tab==='account'?<Account user={user} version={version} onSessionChange={refreshSession}/>:!admin&&adminOnly.includes(tab)?<div className="message">Administrator access is required.</div>:tab==='workflow'?<DailyWorkflow/>:tab.startsWith('data-')?(admin&&dataManagementEnabled?<DataManagement tab={tab} version={version}/>:<div className="message">Data management must be enabled and requires administrator access.</div>):tab==='governance'?(admin?<Governance/>:<div className="message">Administrator access is required.</div>):tab==='model'?(admin?<DataModel version={version}/>:<div className="message">Administrator access is required.</div>):tab==='quality'?(admin?<DataQuality version={version}/>:<div className="message">Administrator access is required.</div>):tab==='observability'?(admin?<Observability version={version}/>:<div className="message">Administrator access is required.</div>):tab==='admin'?(admin?<AdminConsole version={version}/>:<div className="message">Administrator access is required.</div>):tab==='intake'?<Intake/>:tab==='applications'?<Applications version={version}/>:tab==='sources'?<><JobBoards/><div className="table-wrap"><table><thead><tr><th>Company / board</th><th>Provider</th><th>Last successful check</th><th>Latest run</th><th>Candidates</th><th/></tr></thead><tbody>{sources.map(s=><tr key={s.id}><td><strong>{s.company}</strong><small>{s.board}</small></td><td>{s.provider}</td><td>{s.last_success_at?new Date(s.last_success_at).toLocaleString():'Never checked'}</td><td><span className={'badge '+(s.last_error?'warning':'')}>{s.last_error||s.latest_status||'Not started'}</span></td><td>{s.matched??'—'}</td><td>{admin&&<button className="secondary" onClick={async()=>{try{const r=await api<{queued:boolean}>('/sources/'+s.id+'/refresh',{method:'POST'});setNotice(r.queued?'Refresh queued.':'A refresh is already active, or this source cannot be checked again yet.');setVersion(v=>v+1)}catch(e){setError((e as Error).message)}}}>Check source</button>}</td></tr>)}</tbody></table>{!sources.length&&<div className="empty">No sources configured yet.</div>}</div>{admin&&<form className="source-form" onSubmit={async e=>{e.preventDefault();try{await api('/sources',{method:'POST',body:JSON.stringify({company,provider,board})});setCompany('');setBoard('');setVersion(v=>v+1)}catch(e){setError((e as Error).message)}}}><h2>Add an employer board</h2><p className="muted">Use the board identifier from the employer’s official careers page.</p><div className="form-row"><input required value={company} onChange={e=>setCompany(e.target.value)} placeholder="Company name" aria-label="Company name"/><select value={provider} onChange={e=>setProvider(e.target.value)} aria-label="ATS provider"><option value="ashby">Ashby</option><option value="greenhouse">Greenhouse</option><option value="lever">Lever</option></select><input required pattern="[A-Za-z0-9_-]{1,100}" value={board} onChange={e=>setBoard(e.target.value)} placeholder="Board identifier" aria-label="Board identifier"/><button className="primary">Add source</button></div></form>}</>:
 
