@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field, SecretStr
 from src.settings import settings
 from src.db.store import connection, audit
 from src.auth.passwords import password_hash, verify, username, email_address
-from src.auth.local import throttled, token_hash, mfa_enabled, COOKIE
+from src.auth.local import throttled, token_hash, mfa_enabled, on_cookie_domain, COOKIE
 from src.auth import context, scan
 # Imported by name: the Signup field below is called consent, and the class body would shadow a module of that name.
 from src.auth.consent import Choice as ConsentChoice, record as record_consent
@@ -75,11 +75,18 @@ def consume_token(conn, raw, purpose):
                        (token_hash(raw), purpose)).fetchone()
     return row['user_id'] if row else None
 
-def send_verification(conn, user_id, email):
-    queue_mail(conn, 'verify', email, *render_verification(settings().public_origin, issue_token(conn, user_id, 'verify')))
+def account_screen(request):
+    """The hub's account screen (settings.account_screen) for a request that arrived through the public edge, where
+    the emailed links land on its verify and reset pages; '' for the loopback name and console callers, where the
+    screen is not served and this product's own page keeps the landings."""
+    cfg = settings()
+    return cfg.account_screen if request is not None and on_cookie_domain(request) else ''
 
-def send_reset(conn, user_id, email, name=None):
-    queue_mail(conn, 'reset', email, *render_reset(settings().public_origin, issue_token(conn, user_id, 'reset'), name))
+def send_verification(conn, user_id, email, request=None):
+    queue_mail(conn, 'verify', email, *render_verification(settings().public_origin, issue_token(conn, user_id, 'verify'), account_screen(request)))
+
+def send_reset(conn, user_id, email, name=None, request=None):
+    queue_mail(conn, 'reset', email, *render_reset(settings().public_origin, issue_token(conn, user_id, 'reset'), name, account_screen(request)))
 
 def send_account_exists(conn, email, name):
     queue_mail(conn, 'account_exists', email, *render_account_exists(settings().public_origin, name))
@@ -116,7 +123,7 @@ def create_router(current_user):
                     VALUES('local',%s,%s,%s,true,%s,%s) ON CONFLICT DO NOTHING RETURNING id""",
                     (name, display, cfg.signup_default_roles, encoded, email)).fetchone()
                 if row:
-                    send_verification(conn, row['id'], email)
+                    send_verification(conn, row['id'], email, request)
                     # The sign-up record: the phone's rows first (they key the attempt to the account and
                     # carry the phone's consent), then this request's own row, then the choice made on
                     # this form, which is the latest and therefore the current one.
@@ -176,18 +183,18 @@ def create_router(current_user):
         return ACCEPTED
 
     @router.post('/resend', status_code=202)
-    def resend(body: Email):
+    def resend(body: Email, request: Request):
         def wanted(user, conn):
             if user['email_verified_at']:
                 return False
-            send_verification(conn, user['id'], user['email'])
+            send_verification(conn, user['id'], user['email'], request)
             return True
         return mail_request(body, 'account.resend', wanted)
 
     @router.post('/reset-request', status_code=202)
-    def reset_request(body: Email):
+    def reset_request(body: Email, request: Request):
         def wanted(user, conn):
-            send_reset(conn, user['id'], user['email'], user['subject'])
+            send_reset(conn, user['id'], user['email'], user['subject'], request)
             return True
         return mail_request(body, 'account.reset_request', wanted)
 
@@ -217,7 +224,7 @@ def create_router(current_user):
                 'scan_verified': user.get('scan_verified_at') is not None}
 
     @router.patch('/profile')
-    def update_profile(body: Profile, user=Depends(current_user)):
+    def update_profile(body: Profile, request: Request, user=Depends(current_user)):
         fields = []
         display = None
         if body.display_name is not None:
@@ -239,7 +246,7 @@ def create_router(current_user):
                 except psycopg.errors.UniqueViolation:
                     outcome = 'duplicate'
                 else:
-                    send_verification(conn, user['id'], email)
+                    send_verification(conn, user['id'], email, request)
                     fields.append('email')
             audit(conn, str(user['id']), 'account.profile', 'local', outcome, details={'fields': fields})
         return {'ok': True}

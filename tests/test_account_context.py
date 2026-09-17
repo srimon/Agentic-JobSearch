@@ -56,7 +56,8 @@ BERLIN_SIGNED = {k: v for k, v in BERLIN_ROOT.items() if k != 'Cookie'}
 def verify_and_login(client, username='newuser', headers=None):
     with connection() as c:
         mail = c.execute("SELECT text_body FROM jobsearch.outbound_mail WHERE purpose='verify' ORDER BY id DESC").fetchone()['text_body']
-    token = re.search(r'\?verify=([A-Za-z0-9_-]+)', mail).group(1)
+    # /?verify= on the loopback name; the hub's account screen's /account/verify?token= when the sign-up came through the edge
+    token = re.search(r'\?(?:verify|token)=([A-Za-z0-9_-]+)', mail).group(1)
     assert client.post('/api/auth/verify', json={'token': token}, headers=ORIGIN).status_code == 200
     return client.post('/api/auth/login', json={'username': username, 'password': PASSWORD}, headers=headers or BERLIN_ROOT)
 

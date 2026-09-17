@@ -203,6 +203,49 @@ def test_reset_request_and_reset_revoke_sessions(client):
     assert client.post('/api/auth/reset',json={'token':token_from(queued('reset')[1],'reset'),'password':'yet another long passphrase'},headers=HEADERS).status_code==200
     assert login(client,'fresh','yet another long passphrase').status_code==200
 
+def test_mail_through_the_public_edge_lands_on_the_hubs_account_screen(client,monkeypatch):
+    """The hub's product-neutral account screen (its docs/plans/account-screen.md) is served only behind the public
+    edge, on the bare domain. A request that arrived there gets links to the screen's verify and reset pages, which
+    take ?token=; the loopback name keeps this product's own /?verify= and /?reset= landings, as before."""
+    monkeypatch.setattr(settings(),'cookie_domain','bagala.ai')
+    monkeypatch.setattr(settings(),'public_origin','https://bagala.ai/jobsearch')
+    monkeypatch.setattr(settings(),'allowed_origins',['http://localhost:3105','https://bagala.ai'])
+    # What the edge and the Job Search gateway send for the screen's own posts (Origin https://bagala.ai, the short path).
+    edge={'Origin':'https://bagala.ai','Host':'api:8100','X-Forwarded-Host':'bagala.ai','X-Forwarded-Proto':'https','X-Forwarded-Prefix':'/jobsearch'}
+    screen_token=lambda row: re.search(r'\?token=([A-Za-z0-9_-]+)',row['text_body']).group(1)
+    assert client.post('/api/auth/signup',json={'username':'newuser','email':'new.user@example.com','password':PASSWORD,'display_name':'New User'},headers=edge).status_code==202
+    [first]=queued('verify')
+    token=screen_token(first)
+    assert 'https://bagala.ai/account/verify?token='+token in first['text_body']
+    assert 'href="https://bagala.ai/account/verify?token='+token+'"' in first['html_body']
+    assert '?verify=' not in first['text_body'] and 'bagala.ai/jobsearch' not in first['text_body'] and 'bagala.ai/jobsearch' not in first['html_body']
+    # The same account asks again from the loopback name: the product's own landing, unchanged.
+    assert client.post('/api/auth/resend',json={'email':'new.user@example.com'},headers=HEADERS).status_code==202
+    local=queued('verify')[1]
+    assert 'https://bagala.ai/jobsearch/?verify=' in local['text_body'] and '/account/' not in local['text_body'] and '?token=' not in local['text_body']
+    assert verify(client,token).status_code==400  # the newer link retired the screen's token, as any reissue does
+    assert client.post('/api/auth/resend',json={'email':'new.user@example.com'},headers=edge).status_code==202
+    again=queued('verify')[2]
+    assert 'https://bagala.ai/account/verify?token=' in again['text_body']
+    assert verify(client,screen_token(again)).status_code==200  # the token in the screen's link is the live one
+    # A reset asked for through the edge lands on the screen's reset page, and its token works.
+    assert client.post('/api/auth/reset-request',json={'email':'new.user@example.com'},headers=edge).status_code==202
+    [reset_mail]=queued('reset')
+    reset_token=screen_token(reset_mail)
+    assert 'https://bagala.ai/account/reset?token='+reset_token in reset_mail['text_body'] and '?reset=' not in reset_mail['text_body']
+    assert 'Your username is newuser.' in reset_mail['text_body']
+    assert client.post('/api/auth/reset',json={'token':reset_token,'password':'another very long passphrase'},headers=edge).status_code==200
+    # A changed address is confirmed through the screen too when the profile was edited there. The session is started
+    # on the loopback name (an edge sign-in would set a Secure cookie the plain test client never sends back).
+    assert login(client,password='another very long passphrase').status_code==200
+    assert client.patch('/api/auth/profile',json={'email':'changed@example.org'},headers=edge).status_code==200
+    changed=queued('verify')[3]
+    assert changed['to_address']=='changed@example.org' and 'https://bagala.ai/account/verify?token=' in changed['text_body']
+    # The notice to an address that already has an account still names the product's own sign-in and forgot pages.
+    assert client.post('/api/auth/signup',json={'username':'another','email':'changed@example.org','password':PASSWORD},headers=edge).status_code==202
+    [notice]=queued('account_exists')
+    assert 'https://bagala.ai/jobsearch/' in notice['text_body'] and '/account/' not in notice['text_body']
+
 def test_profile_password_and_sessions(client):
     signed_up_and_verified(client)
     profile=client.get('/api/auth/profile').json()
@@ -403,6 +446,7 @@ def test_settings_parse_lists_json_and_defaults(monkeypatch):
     monkeypatch.setenv('JOBSEARCH_HUB_ORIGINS','https://hub.bagala.ai')
     monkeypatch.setenv('JOBSEARCH_PUBLIC_ORIGIN','https://jobs.bagala.ai')
     monkeypatch.setenv('JOBSEARCH_HUB_LINKS_PUBLIC','{"hub":"https://hub.example/"}')
+    monkeypatch.setenv('JOBSEARCH_ACCOUNT_SCREEN',' https://accounts.example/screen/ ')
     monkeypatch.setenv('JOBSEARCH_SIGNUP_DEFAULT_ROLES','viewer,member')
     monkeypatch.setenv('JOBSEARCH_COOKIE_DOMAIN','.Bagala.ai')
     monkeypatch.setenv('JOBSEARCH_COOKIE_SAMESITE','Lax')
@@ -411,6 +455,9 @@ def test_settings_parse_lists_json_and_defaults(monkeypatch):
     assert s.allowed_origins==['http://localhost:3105','https://jobs.bagala.ai'] and s.hub_origins==['https://hub.bagala.ai']
     assert s.secure_cookies is True and s.cookie_domain=='bagala.ai' and s.cookie_samesite=='lax' and s.public_origin=='https://jobs.bagala.ai'
     assert s.hub_links_public=={'hub':'https://hub.example/'} and s.hub_links_local['prep']=='http://localhost:3188/' and s.signup_default_roles==['viewer','member']
+    assert s.account_screen=='https://accounts.example/screen'
+    monkeypatch.delenv('JOBSEARCH_ACCOUNT_SCREEN')
+    assert Settings(_env_file=None).account_screen=='https://bagala.ai/account'  # the hub's screen on the bare domain
     assert s.mail_transport=='log' and s.resend_api_key_file=='/run/secrets/resend/api.key' and s.owner_username=='admin' and s.signup_enabled is False
     monkeypatch.delenv('JOBSEARCH_ALLOWED_ORIGINS')
     assert Settings(_env_file=None).allowed_origins==['http://localhost:3105','https://jobs.bagala.ai']

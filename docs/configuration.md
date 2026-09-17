@@ -9,6 +9,7 @@ All settings are read by `src/settings.py` from the environment with the `JOBSEA
 | JOBSEARCH_MAINTENANCE_MODE | false | Rejects state-changing requests except sign-in/out with 503. |
 | JOBSEARCH_ORIGIN | http://localhost:3105 | Local browser origin of the front end. |
 | JOBSEARCH_PUBLIC_ORIGIN (new) | = origin | Browser-facing address used in emailed links and in the sign-in returns other products send; may carry a path. Production `https://bagala.ai/jobsearch` (the short path on the shared host; `https://jobs.bagala.ai` still serves the same deployment). |
+| JOBSEARCH_ACCOUNT_SCREEN (new) | https://bagala.ai/account | The hub's product-neutral account screen. Verification and reset mails link to its `verify?token=` and `reset?token=` pages when the request arrived through the public edge (host on `JOBSEARCH_COOKIE_DOMAIN`); the loopback name and console callers keep this product's own `/?verify=` and `/?reset=` landings, because the screen is served only behind the edge. Empty keeps the landings everywhere. |
 | JOBSEARCH_ALLOWED_ORIGINS (new) | origin plus public_origin | Origins accepted by the CSRF check for POST/PUT/PATCH/DELETE (exact match on the `Origin` header). |
 | JOBSEARCH_HUB_ORIGINS (new) | http://localhost:3180 | Origins allowed to read `/api/workflow` with credentials (CORS special case). |
 | JOBSEARCH_LIBRARY_ORIGINS (new) | http://localhost:3001,http://localhost:3011,http://localhost:8000,http://localhost:8010 | Origins the library gateway may forward for state-changing requests to `/api/hub/library-authorize`. |

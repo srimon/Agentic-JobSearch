@@ -162,9 +162,25 @@ def test_the_short_path_is_the_public_origin_and_the_host_it_is_on_is_an_accepte
 def test_emailed_links_land_on_the_short_path(monkeypatch):
     from src import mail
     monkeypatch.setenv('JOBSEARCH_PUBLIC_ORIGIN', 'https://bagala.ai/jobsearch')
-    origin = Settings(_env_file=None).public_origin
+    monkeypatch.delenv('JOBSEARCH_ACCOUNT_SCREEN', raising=False)
+    s = Settings(_env_file=None)
+    origin = s.public_origin
     assert '://bagala.ai/jobsearch/?verify=tok' in ' '.join(str(part) for part in mail.render_verification(origin, 'tok'))
     assert '://bagala.ai/jobsearch/?reset=tok' in ' '.join(str(part) for part in mail.render_reset(origin, 'tok', 'name'))
+    # Through the public edge the links open the hub's account screen instead (settings.account_screen, the
+    # hub's docs/plans/account-screen.md), whose verify and reset pages take ?token=; the product's own page
+    # is not named. The screen lives on the bare domain, not under the product's short path.
+    assert s.account_screen == 'https://bagala.ai/account'
+    verification = ' '.join(str(part) for part in mail.render_verification(origin, 'tok', s.account_screen))
+    reset = ' '.join(str(part) for part in mail.render_reset(origin, 'tok', 'name', s.account_screen))
+    assert 'https://bagala.ai/account/verify?token=tok' in verification and 'jobsearch' not in verification and '?verify=' not in verification
+    assert 'https://bagala.ai/account/reset?token=tok' in reset and 'jobsearch' not in reset and '?reset=' not in reset
+    assert 'href="https://bagala.ai/account/reset?token=tok"' in mail.render_reset(origin, 'tok', 'name', s.account_screen)[2]
+    # A trailing slash on the setting is harmless; an empty setting keeps the product's landings everywhere.
+    monkeypatch.setenv('JOBSEARCH_ACCOUNT_SCREEN', 'https://bagala.ai/account/')
+    assert Settings(_env_file=None).account_screen == 'https://bagala.ai/account'
+    assert 'https://bagala.ai/account/verify?token=tok' in mail.render_verification(origin, 'tok', 'https://bagala.ai/account/')[1]
+    assert '://bagala.ai/jobsearch/?verify=tok' in mail.render_verification(origin, 'tok', '')[1]
 
 
 def test_the_two_step_code_step_rides_on_the_address_the_browser_is_using(client):

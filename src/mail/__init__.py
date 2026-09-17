@@ -28,14 +28,24 @@ def _message(title, lines, link, expiry):
     return text, page
 
 
-def render_verification(public_origin, token):
-    link = public_origin.rstrip('/') + '/?verify=' + token
+def landing(public_origin, account_screen, page, parameter, token):
+    """Where an emailed token link lands: the hub's account screen (…/account/verify?token=, …/account/reset?token=)
+    when the request came through the public edge and named it, else this product's own page (/?verify=, /?reset=),
+    which the loopback name keeps because the screen is not served there. The screen's pages accept ?verify= and
+    ?reset= too, so an older link keeps working either way."""
+    if account_screen:
+        return account_screen.rstrip('/') + '/' + page + '?token=' + token
+    return public_origin.rstrip('/') + '/?' + parameter + '=' + token
+
+
+def render_verification(public_origin, token, account_screen=''):
+    link = landing(public_origin, account_screen, 'verify', 'verify', token)
     text, page = _message('Confirm your Bagala account', ['Open the link below to verify your email address and activate sign-in.'], link, 'The link works once and expires in 24 hours.')
     return 'Confirm your Bagala account', text, page
 
 
-def render_reset(public_origin, token, username=None):
-    link = public_origin.rstrip('/') + '/?reset=' + token
+def render_reset(public_origin, token, username=None, account_screen=''):
+    link = landing(public_origin, account_screen, 'reset', 'reset', token)
     lines = ['Open the link below to choose a new password. All existing sessions are signed out when it is used.']
     if username:
         lines.append('Your username is ' + username + '. You can also sign in with this email address.')

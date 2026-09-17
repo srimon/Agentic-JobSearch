@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     # returns other products send here; defaults to origin. It may carry a path, because the
     # products are moving to short paths on one host: production is https://bagala.ai/jobsearch.
     public_origin: str = ''
+    # The product-neutral account screen the hub serves on the bare domain (the hub's
+    # docs/plans/account-screen.md). Emailed verification and reset links open its pages
+    # (/verify?token=, /reset?token=) when the request arrived through the public edge, i.e. on
+    # cookie_domain; the loopback name keeps this product's own landings (/?verify=, /?reset=)
+    # because the screen is not served there. Empty keeps the landings everywhere.
+    account_screen: str = 'https://bagala.ai/account'
     # Origins accepted by the CSRF check for state-changing requests; defaults to origin plus public_origin.
     allowed_origins: Annotated[list[str], NoDecode] = []
     # Hub origins allowed to read /api/workflow with credentials (CORS special case).
@@ -136,6 +142,7 @@ class Settings(BaseSettings):
     def resolve_public_edge(self):
         self.origin = self.origin.strip().rstrip('/')
         self.public_origin = (self.public_origin.strip().rstrip('/')) or self.origin
+        self.account_screen = self.account_screen.strip().rstrip('/')
         if not self.allowed_origins:
             # An Origin header is scheme://host[:port] and never carries a path, so a public
             # address on a short path (https://bagala.ai/jobsearch) contributes its origin.
