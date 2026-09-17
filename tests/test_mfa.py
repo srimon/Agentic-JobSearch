@@ -74,7 +74,7 @@ def turn_on(client, clock):
 
 def challenge(client):
     r = login(client)
-    assert r.status_code == 200 and r.json() == {'ok': True, 'mfa_required': True}
+    assert r.status_code == 200 and r.json() == {'ok': True, 'mfa_required': True, 'method': 'totp'}
     return r
 
 
@@ -250,7 +250,7 @@ def test_password_reset_keeps_mfa(client, clock):
     assert client.post('/api/auth/reset', json={'token': token, 'password': 'a fresh replacement passphrase'}, headers=HEADERS).status_code == 200
     with TestClient(app) as fresh:
         r = login(fresh, 'two.step@example.com', 'a fresh replacement passphrase')
-        assert r.json() == {'ok': True, 'mfa_required': True}
+        assert r.json() == {'ok': True, 'mfa_required': True, 'method': 'totp'}
         assert post(fresh, '/verify', {'code': totp.totp(secret)}).status_code == 200
 
 

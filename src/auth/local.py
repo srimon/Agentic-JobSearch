@@ -8,12 +8,15 @@ from pydantic import BaseModel, Field, SecretStr
 from src.settings import settings
 from src.db.store import connection, audit
 from src.auth.passwords import verify, username, hasher
+from src.auth import context as visitor_context
+from src.mail import queue_mail, render_login_code
 
 router = APIRouter()
 COOKIE = 'jobsearch_session'
 # Carries the pending two-step sign-in between the password and the code; scoped to the auth routes only.
 MFA_COOKIE = 'jobsearch_mfa'
 MFA_CHALLENGE_SECONDS = 300
+EMAIL_CODE_DIGITS = 6
 INVALID_LOGIN = 'Invalid username, email or password'
 
 class Credentials(BaseModel):
@@ -59,6 +62,9 @@ def prune(conn):
       (SELECT token_hash FROM jobsearch.auth_tokens WHERE expires_at <= now() FOR UPDATE SKIP LOCKED)""")
     conn.execute("""DELETE FROM jobsearch.mfa_challenges WHERE token_hash IN
       (SELECT token_hash FROM jobsearch.mfa_challenges WHERE expires_at <= now() - interval '1 hour' FOR UPDATE SKIP LOCKED)""")
+    from src.auth import scan  # imported here: scan imports this module
+    visitor_context.prune(conn)
+    scan.prune(conn)
 
 def find_account(conn, value):
     """Local account for a sign-in identifier: an address containing '@' matches the email case-insensitively first,
@@ -141,16 +147,33 @@ def session_response(request, raw):
     response.set_cookie(COOKIE, raw, max_age=settings().session_hours*3600, **cookie_options(request))
     return response
 
-def start_challenge(conn, user_id):
+def new_login_code():
+    return '{:0{width}d}'.format(secrets.randbelow(10 ** EMAIL_CODE_DIGITS), width=EMAIL_CODE_DIGITS)
+
+def code_digest(user_id, code):
+    """An e-mail code is stored as a digest bound to the account, like a recovery code."""
+    return hashlib.sha256((str(user_id) + ':login-code:' + ''.join((code or '').split())).encode()).hexdigest()
+
+def start_challenge(conn, user_id, method='totp', email=None):
+    """A short single-use challenge between the password step and the code step. For the e-mail
+    method the six-digit code is drawn here, stored as a digest and queued to the verified address;
+    the code itself never touches a log or an audit record."""
     raw = secrets.token_urlsafe(32)
-    conn.execute('INSERT INTO jobsearch.mfa_challenges(token_hash,user_id,expires_at) VALUES(%s,%s,%s)',
-                 (token_hash(raw), user_id, datetime.now(timezone.utc)+timedelta(seconds=MFA_CHALLENGE_SECONDS)))
+    digest = None
+    if method == 'email':
+        code = new_login_code()
+        digest = code_digest(user_id, code)
+        queue_mail(conn, 'login_code', email, *render_login_code(code, MFA_CHALLENGE_SECONDS // 60))
+    conn.execute('INSERT INTO jobsearch.mfa_challenges(token_hash,user_id,expires_at,method,code_hash) VALUES(%s,%s,%s,%s,%s)',
+                 (token_hash(raw), user_id, datetime.now(timezone.utc)+timedelta(seconds=MFA_CHALLENGE_SECONDS), method, digest))
     return raw
 
 @router.post('/api/auth/login')
 def login(body: Credentials, request: Request):
+    cfg = settings()
     denied = unverified = False
     raw = challenge = None
+    method = 'totp'
     with connection() as conn:
         prune(conn)
         match = find_account(conn, body.username)
@@ -172,8 +195,14 @@ def login(body: Credentials, request: Request):
                     # The password alone never yields a session: a short single-use challenge waits for the code.
                     challenge = start_challenge(conn, user['id'])
                     audit(conn, str(user['id']), 'login', 'local', 'mfa_required')
+                elif cfg.login_email_code and user['email'] and user['email_verified_at']:
+                    # No authenticator app: the second step is a code sent to the verified address.
+                    method = 'email'
+                    challenge = start_challenge(conn, user['id'], 'email', user['email'])
+                    audit(conn, str(user['id']), 'login', 'local', 'mfa_required', details={'method': 'email'})
                 else:
                     raw = start_session(conn, user)
+                    visitor_context.record(conn, 'signin', visitor_context.visitor(request), user_id=user['id'])
             else:
                 audit(conn, 'anonymous', 'login', 'local', 'denied')
     # Errors must be raised after committing counters and audit records.
@@ -182,7 +211,7 @@ def login(body: Credentials, request: Request):
     if unverified:
         raise HTTPException(403, 'Verify your email address before signing in.')
     if challenge:
-        response = JSONResponse({'ok': True, 'mfa_required': True})
+        response = JSONResponse({'ok': True, 'mfa_required': True, 'method': method})
         response.set_cookie(MFA_COOKIE, challenge, max_age=MFA_CHALLENGE_SECONDS, **mfa_cookie_options(request))
         return response
     if raw is None:

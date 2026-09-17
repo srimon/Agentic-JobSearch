@@ -80,3 +80,6 @@ main{margin-left:250px;width:calc(100% - 250px)}.topbar{height:76px;background:v
 /* Non-blocking confirmation (e.g. "Job dismissed" with Undo); the list below keeps its place. */
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:12px;max-width:calc(100vw - 32px);padding:10px 12px 10px 16px;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-left:4px solid var(--header-gold,#C99A2E);border-radius:10px;box-shadow:0 8px 24px #1d180c29;font-size:13px}.toast .secondary{padding:6px 12px;font-size:12px}.toast .icon-button{padding:4px}
 .filters select{max-width:100%;text-overflow:ellipsis}@media(max-width:700px){.toast{bottom:16px;left:16px;right:16px;transform:none}}
+.consent{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:0;display:grid;gap:10px;text-align:left}.consent legend{padding:0 4px;font-size:13px;line-height:1.5;color:var(--ink)}.consent-choice{display:flex!important;gap:10px;align-items:flex-start;font-size:13px;line-height:1.5}.consent-choice input{width:auto!important;margin:3px 0 0;flex-shrink:0}.consent .hint{margin:0}
+.scan-check{display:grid;gap:8px;justify-items:center}.scan-check .hint{text-align:center}
+.trap{position:absolute;left:-10000px;top:auto;width:1px;height:1px;overflow:hidden}

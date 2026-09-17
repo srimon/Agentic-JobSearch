@@ -43,6 +43,20 @@ def render_reset(public_origin, token, username=None):
     return 'Reset your Bagala password', text, page
 
 
+def render_login_code(code, minutes):
+    """The second sign-in step for an account without an authenticator app: a six-digit code that
+    works once. No link: the code is typed on the page that asked for it."""
+    title = 'Your Bagala sign-in code'
+    lines = ['Your sign-in code is ' + code + '.',
+             'Enter it on the Bagala sign-in page within ' + str(minutes) + ' minutes. It works once.',
+             'If you did not just enter your password on Bagala, someone else knows it: sign in and change your password.']
+    text = title + '\n\n' + '\n'.join(lines) + '\n'
+    page = ('<!doctype html><html><body style="font-family:sans-serif"><h2>' + html.escape(title) + '</h2>' +
+            '<p style="font-size:28px;letter-spacing:4px"><strong>' + html.escape(code) + '</strong></p>' +
+            ''.join('<p>' + html.escape(line) + '</p>' for line in lines[1:]) + '</body></html>')
+    return title, text, page
+
+
 def render_account_exists(public_origin, username):
     """Sent when someone signs up with an address that already has an account. Carries no token: both links lead to
     the ordinary sign-in and password reset pages."""

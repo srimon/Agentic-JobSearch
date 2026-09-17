@@ -10,6 +10,9 @@ from src.settings import settings
 from src.db.store import connection, audit
 from src.auth.passwords import password_hash, verify, username, email_address
 from src.auth.local import throttled, token_hash, mfa_enabled, COOKIE
+from src.auth import context, scan
+# Imported by name: the Signup field below is called consent, and the class body would shadow a module of that name.
+from src.auth.consent import Choice as ConsentChoice, record as record_consent
 from src.mail import queue_mail, render_verification, render_reset, render_account_exists
 
 ACCEPTED = {'detail': 'check your email'}
@@ -23,6 +26,13 @@ class Signup(BaseModel):
     email: str = Field(min_length=1, max_length=254)
     password: SecretStr = Field(min_length=1, max_length=128)
     display_name: str = Field(default='', max_length=120)
+    # The consent choice the form showed (src/auth/consent.py); absent from older clients, which records nothing.
+    consent: ConsentChoice | None = None
+    # The desktop secret of a phone-scan attempt (src/auth/scan.py), when the form showed a code.
+    attempt: str | None = Field(default=None, max_length=64)
+    # A honeypot: the form renders this field out of sight and people leave it empty; a filled one
+    # is answered exactly like a sign-up and creates nothing (the enquiry form does the same).
+    website: str = Field(default='', max_length=1000)
 
 class Token(BaseModel):
     token: str = Field(min_length=1, max_length=128)
@@ -82,15 +92,20 @@ def create_router(current_user):
     router = APIRouter(prefix='/api/auth')
 
     @router.post('/signup', status_code=202)
-    def signup(body: Signup):
+    def signup(body: Signup, request: Request):
         cfg = settings()
         if not cfg.signup_enabled:
             raise HTTPException(404, 'Not Found')
+        if body.website.strip():
+            with connection() as conn:
+                audit(conn, 'anonymous', 'account.signup', 'local', 'honeypot')
+            return ACCEPTED
         name = checked(username, body.username)
         email = checked(email_address, body.email)
         encoded = checked(password_hash, body.password.get_secret_value())
         display = ' '.join(body.display_name.split()) or name
         username_taken = False
+        seen = context.visitor(request)
         with connection() as conn:
             throttle = throttled(conn, [('signup', 30), (email_bucket('signup', email), 5)])
             if throttle:
@@ -102,7 +117,16 @@ def create_router(current_user):
                     (name, display, cfg.signup_default_roles, encoded, email)).fetchone()
                 if row:
                     send_verification(conn, row['id'], email)
-                    audit(conn, str(row['id']), 'account.signup', 'local')
+                    # The sign-up record: the phone's rows first (they key the attempt to the account and
+                    # carry the phone's consent), then this request's own row, then the choice made on
+                    # this form, which is the latest and therefore the current one.
+                    attempt_id, scanned = scan.complete(conn, body.attempt, row['id'])
+                    context.record(conn, 'desktop', seen, user_id=row['id'], attempt_id=attempt_id)
+                    regime = context.regime(seen['country'], seen['region_code'])
+                    if body.consent is not None:
+                        record_consent(conn, row['id'], body.consent.model_dump(), 'signup', regime, seen['ip'], seen['country'])
+                    audit(conn, str(row['id']), 'account.signup', 'local',
+                          details={'scan_verified': scanned, 'consent': body.consent is not None, 'regime': regime})
                 else:
                     # Nothing was inserted, so at least one key already existed; find out which after the fact.
                     owner = conn.execute('SELECT id,subject,email,active FROM jobsearch.users WHERE lower(email)=lower(%s)', (email,)).fetchone()
@@ -189,7 +213,8 @@ def create_router(current_user):
             mfa = mfa_enabled(conn, user['id'])
         return {'username': user['subject'], 'display_name': user['display_name'], 'email': user.get('email'),
                 'email_verified': user.get('email_verified_at') is not None, 'roles': user['roles'],
-                'created_at': user.get('created_at'), 'last_login_at': user.get('last_login_at'), 'mfa_enabled': mfa}
+                'created_at': user.get('created_at'), 'last_login_at': user.get('last_login_at'), 'mfa_enabled': mfa,
+                'scan_verified': user.get('scan_verified_at') is not None}
 
     @router.patch('/profile')
     def update_profile(body: Profile, user=Depends(current_user)):

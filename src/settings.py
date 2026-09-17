@@ -73,6 +73,23 @@ class Settings(BaseSettings):
     # A new account is a member: viewer alone cannot open Job Prep (it asks for member or above),
     # so self-service sign-ups could reach only Job Search and the Library (16 Sep 2026).
     signup_default_roles: Annotated[list[str], NoDecode] = ['member']
+    # Account creation options (the hub's docs/plans/account-creation-options.md). Every switch is
+    # off by default, so deploying the code changes nothing until the owner turns a stage on.
+    # The phone-scan check: the sign-up form shows a QR code that a phone scans within
+    # signup_scan_seconds to confirm a person with a handheld device is behind the sign-up.
+    signup_scan_enabled: bool = False
+    signup_scan_seconds: int = Field(default=120, ge=30, le=600)
+    # Whether the phone page may ask for a phone number (stored unverified until an SMS
+    # provider exists; keep this off until then).
+    phone_collection_enabled: bool = False
+    # The default second sign-in step for an account without an authenticator app: a six-digit
+    # code sent to the verified e-mail address. Accounts with an authenticator keep using it.
+    login_email_code: bool = False
+    # Consent regimes are read from the visitor's location. A US visitor whose region is unknown
+    # (the location headers are off at the edge) is treated like a Californian while this is on.
+    consent_strict_unknown_region: bool = True
+    # Sign-in context rows are kept this long; sign-up rows live as long as the account.
+    context_signin_retention_days: int = Field(default=90, ge=1, le=3650)
     mail_transport: Literal['log','resend'] = 'log'
     mail_from: str = 'Bagala <no-reply@bagala.ai>'
     resend_api_key_file: str = '/run/secrets/resend/api.key'

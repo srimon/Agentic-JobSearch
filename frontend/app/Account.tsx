@@ -1,10 +1,13 @@
 'use client';
 import {useEffect,useState,type FormEvent} from 'react';
-import {CircleCheck,TriangleAlert,LogOut,MailCheck,KeyRound,MonitorSmartphone,UserRound,ShieldCheck,Copy} from 'lucide-react';
-import {api,describeError,signOutToSignIn,type User} from './session';
+import {CircleCheck,TriangleAlert,LogOut,MailCheck,KeyRound,MonitorSmartphone,UserRound,ShieldCheck,Copy,SlidersHorizontal} from 'lucide-react';
+import {api,describeError,signOutToSignIn,type User,type ConsentChoice,type ConsentNotice} from './session';
+import ConsentChoices,{NO_CONSENT} from './ConsentChoices';
 import Dialog from './Dialog';
 
-type Profile={username:string;display_name:string;email:string;email_verified:boolean;roles:string[];created_at?:string|null;last_login_at?:string|null;mfa_enabled?:boolean};
+type Profile={username:string;display_name:string;email:string;email_verified:boolean;roles:string[];created_at?:string|null;last_login_at?:string|null;mfa_enabled?:boolean;scan_verified?:boolean};
+/** GET /api/auth/consent: the current choices, when they were made and against which version of the notice. */
+type ConsentRead={choices:ConsentChoice;version:string|null;regime:string|null;updated_at:string|null;recorded:boolean;notice:ConsentNotice;current_version:string;opt_in_required:boolean};
 type MfaStatus={enabled:boolean;recovery_codes_remaining:number};
 type MfaSetup={secret:string;otpauth_uri:string;qr_svg?:string|null};
 type SessionRow={created_at:string;expires_at:string;current:boolean};
@@ -29,12 +32,19 @@ export default function Account({user,version,onSessionChange}:{user:User;versio
  const [setupStep,setSetupStep]=useState<'closed'|'password'|'scan'>('closed'),[setupPassword,setSetupPassword]=useState(''),[setup,setSetup]=useState<MfaSetup|null>(null),[setupCode,setSetupCode]=useState(''),[setupNote,setSetupNote]=useState<Note>(null);
  const [recoveryCodes,setRecoveryCodes]=useState<string[]|null>(null);
  const [mfaForm,setMfaForm]=useState<'none'|'off'|'codes'>('none'),[offPassword,setOffPassword]=useState(''),[mfaCode,setMfaCode]=useState('');
+ const [consentState,setConsentState]=useState<ConsentRead|null|undefined>(undefined),[consentChoice,setConsentChoice]=useState<ConsentChoice>(NO_CONSENT),[consentNote,setConsentNote]=useState<Note>(null);
 
  useEffect(()=>{let active=true;setLoadNote(null);
   api<Profile>('/auth/profile').then(p=>{if(!active)return;setProfile(p);setDisplayName(p.display_name||'');setEmail(p.email||'')}).catch(e=>{if(active)setLoadNote({kind:'error',text:describeError(e,{404:'Profile details are not available on this server yet.'})})});
   api<SessionRow[]>('/auth/sessions').then(rows=>{if(active)setSessions(Array.isArray(rows)?rows:[])}).catch(()=>{if(active)setSessions(null)});
   api<MfaStatus>('/auth/mfa').then(s=>{if(active)setMfa(s)}).catch(()=>{if(active)setMfa(null)});
+  api<ConsentRead>('/auth/consent').then(c=>{if(!active)return;setConsentState(c);setConsentChoice(c.choices)}).catch(()=>{if(active)setConsentState(null)});
   return()=>{active=false}},[version,reload]);
+
+ function saveConsent(e:FormEvent){e.preventDefault();setConsentNote(null);
+  run('consent',async()=>{const result=await api<{ok:boolean;choices:ConsentChoice;version:string;updated_at:string}>('/auth/consent',{method:'PUT',body:JSON.stringify(consentChoice)});
+   setConsentState(s=>s&&{...s,choices:result.choices,version:result.version,updated_at:result.updated_at,recorded:true});setConsentChoice(result.choices);
+   setConsentNote({kind:'ok',text:'Saved. Your choices apply from now on.'})},text=>setConsentNote({kind:'error',text}))}
 
  async function run(key:string,task:()=>Promise<void>,onError:(text:string)=>void,map?:Partial<Record<number,string>>){setBusy(key);try{await task()}catch(e){onError(describeError(e,map))}finally{setBusy('')}}
 
@@ -119,6 +129,15 @@ export default function Account({user,version,onSessionChange}:{user:User;versio
     </form>}
     {mfaForm==='none'&&<div className="account-actions">{mfa.enabled?<><button type="button" className="secondary" disabled={!!busy} onClick={()=>showMfaForm('codes')}>New recovery codes</button><button type="button" className="secondary danger" disabled={!!busy} onClick={()=>showMfaForm('off')}>Turn off</button></>:<button type="button" className="primary" disabled={!!busy} onClick={openSetup}>Set up two-step sign-in</button>}</div>}
    </>}
+  </section>
+
+  <section className="account-panel" aria-labelledby="account-consent"><h2 id="account-consent"><SlidersHorizontal size={20}/>Your data choices</h2><p>Whether we may use details about you beyond running the service. Turn each choice on or off at any time; a change applies from that moment, and what you have turned off is left out of any use for that purpose.</p>
+   {consentState===undefined?<p className="muted">Loading…</p>:consentState===null?<p className="muted">Your data choices are not available right now.</p>:<form className="account-form" onSubmit={saveConsent}>
+    <ConsentChoices notice={consentState.notice} optInRequired={consentState.opt_in_required} value={consentChoice} onChange={setConsentChoice} disabled={!!busy}/>
+    <p className="muted">{consentState.recorded?'Last changed '+when(consentState.updated_at)+(consentState.version!==consentState.current_version?' (the wording has changed since; saving records the current wording).':'.'):'No choice recorded yet: nothing about you is used beyond running the service.'}</p>
+    <Notice note={consentNote}/>
+    <div className="account-actions"><button className="primary" disabled={!!busy}>{busy==='consent'?'Saving…':'Save choices'}</button></div>
+   </form>}
   </section>
 
   {setupStep!=='closed'&&<Dialog labelledBy="mfa-setup-title" onClose={closeSetup}>

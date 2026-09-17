@@ -160,10 +160,15 @@ def session(request:Request):
     # Links follow the request host so the front end never hard-codes localhost or the public edge.
     # idle_minutes is this visitor's own allowance (0 for an administrator, who is exempt, and 0
     # when the limit is off), so the front end can warn just before it runs out.
+    # consent: the regime this visitor's location puts them under and the notice the sign-up form
+    # shows (src/auth/consent.py); features.signup_scan says whether the form shows a phone-scan code.
     return {'user': {'name':user['display_name'],'roles':user['roles']} if user else None,
-            'identity_ready':True,'provider':'Local','features':{'data_management':cfg.data_management_enabled,'maintenance':cfg.maintenance_mode},
+            'identity_ready':True,'provider':'Local',
+            'features':{'data_management':cfg.data_management_enabled,'maintenance':cfg.maintenance_mode,
+                        'signup_scan':cfg.signup_enabled and cfg.signup_scan_enabled,'phone_collection':cfg.phone_collection_enabled},
             'idle_minutes':idle_minutes_for(user) if user else 0,
-            'links':cfg.hub_links_public if on_cookie_domain(request) else cfg.hub_links_local,'signup_enabled':cfg.signup_enabled}
+            'links':cfg.hub_links_public if on_cookie_domain(request) else cfg.hub_links_local,'signup_enabled':cfg.signup_enabled,
+            'consent':consent_defaults(request)}
 
 
 @app.post('/api/auth/logout')
@@ -183,6 +188,10 @@ from src.auth.signup import create_router as signup_router
 app.include_router(signup_router(current_user))
 from src.auth.mfa import create_router as mfa_router
 app.include_router(mfa_router(current_user))
+from src.auth.scan import create_router as scan_router
+app.include_router(scan_router())
+from src.auth.consent import create_router as consent_router, defaults as consent_defaults
+app.include_router(consent_router(current_user))
 
 
 @app.get('/api/hub/prep-identity')

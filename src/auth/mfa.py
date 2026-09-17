@@ -1,18 +1,24 @@
 """Optional two-step sign-in: an authenticator app (TOTP, RFC 6238) with single-use recovery codes.
 The TOTP secret is AES-GCM encrypted with the intake key, bound to the account and purpose; recovery codes are stored
 as SHA-256 digests. Audit records name outcomes only, never codes or secrets."""
+import hmac
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, SecretStr
 from src.db.store import connection, audit
 from src.applications.private import encrypt, decrypt
 from src.auth import totp
+from src.auth import context as visitor_context
 from src.auth.passwords import verify
-from src.auth.local import (COOKIE, MFA_COOKIE, throttled, token_hash, login_buckets, start_session, session_response,
-                            mfa_cookie_options)
+from src.auth.local import (COOKIE, MFA_COOKIE, MFA_CHALLENGE_SECONDS, throttled, token_hash, login_buckets, start_session,
+                            session_response, mfa_cookie_options, code_digest, new_login_code)
+from src.auth.signup import email_bucket
+from src.mail import queue_mail, render_login_code
 
 KIND = 'mfa-totp'  # associated data: f'{user_id}:mfa-totp:v1'
 MAX_CHALLENGE_ATTEMPTS = 5
+# An e-mail code may be sent again this many times per challenge, within the address's mail budget.
+MAX_RESENDS = 2
 RETRY_LATER = HTTPException(429, 'Too many attempts. Try again later.', headers={'Retry-After': '900'})
 UNAVAILABLE = HTTPException(503, 'Two-step sign-in is not available right now.')
 WRONG_CODE = 'That code did not work. Check your authenticator app and try again.'
@@ -223,18 +229,24 @@ def create_router(current_user):
                     challenge = conn.execute("""SELECT * FROM jobsearch.mfa_challenges WHERE token_hash=%s AND consumed_at IS NULL
                         AND expires_at>now() AND attempts<%s FOR UPDATE""", (token_hash(raw), MAX_CHALLENGE_ATTEMPTS)).fetchone()
                     user = conn.execute('SELECT * FROM jobsearch.users WHERE id=%s', (found['user_id'],)).fetchone()
-                    mfa = conn.execute('SELECT * FROM jobsearch.user_mfa WHERE user_id=%s AND enabled_at IS NOT NULL FOR UPDATE', (found['user_id'],)).fetchone()
+                    # An e-mail challenge is answered by the code it was sent with; an authenticator challenge by the app.
+                    by_email = bool(challenge and challenge['method'] == 'email')
+                    mfa = None if by_email else conn.execute('SELECT * FROM jobsearch.user_mfa WHERE user_id=%s AND enabled_at IS NOT NULL FOR UPDATE', (found['user_id'],)).fetchone()
                     usable = challenge and user and user['active'] and (not user['email'] or user['email_verified_at'])
-                    if not usable or not mfa:
+                    if not usable or (not by_email and not mfa):
                         outcome = 'expired'
                         if challenge:
                             conn.execute('UPDATE jobsearch.mfa_challenges SET consumed_at=now() WHERE token_hash=%s', (challenge['token_hash'],))
                     else:
-                        method = second_factor(conn, mfa, code or '', allow_recovery=True) if code else None
+                        if by_email:
+                            method = 'email' if code and hmac.compare_digest(challenge['code_hash'] or '', code_digest(user['id'], code)) else None
+                        else:
+                            method = second_factor(conn, mfa, code or '', allow_recovery=True) if code else None
                         if method:
                             conn.execute('UPDATE jobsearch.mfa_challenges SET consumed_at=now() WHERE token_hash=%s', (challenge['token_hash'],))
                             session = start_session(conn, user, 'mfa-' + method)
-                            outcome = 'allowed' if method == 'totp' else 'recovery_code'
+                            visitor_context.record(conn, 'signin', visitor_context.visitor(request), user_id=user['id'])
+                            outcome = 'recovery_code' if method == 'recovery' else 'allowed'
                         else:
                             attempts = conn.execute('UPDATE jobsearch.mfa_challenges SET attempts=attempts+1 WHERE token_hash=%s RETURNING attempts',
                                                     (challenge['token_hash'],)).fetchone()['attempts']
@@ -252,5 +264,37 @@ def create_router(current_user):
         response = JSONResponse({'detail': EXPIRED}, status_code=400)
         response.delete_cookie(MFA_COOKIE, **mfa_cookie_options(request))
         return response
+
+    @router.post('/resend', status_code=202)
+    def resend(request: Request):
+        """A fresh e-mail code for the challenge in the cookie, replacing the last one: at most
+        MAX_RESENDS times per challenge and within the address's mail budget (shared with
+        verification and reset mail)."""
+        raw = request.cookies.get(MFA_COOKIE, '')
+        outcome = 'expired'
+        row = None
+        with connection() as conn:
+            row = conn.execute("""SELECT c.token_hash,c.user_id,c.resends,u.email FROM jobsearch.mfa_challenges c JOIN jobsearch.users u ON u.id=c.user_id
+                WHERE c.token_hash=%s AND c.method='email' AND c.consumed_at IS NULL AND c.expires_at>now() AND c.attempts<%s
+                AND u.active AND u.email IS NOT NULL FOR UPDATE OF c""", (token_hash(raw), MAX_CHALLENGE_ATTEMPTS)).fetchone() if raw else None
+            if row:
+                if row['resends'] >= MAX_RESENDS:
+                    outcome = 'exhausted'
+                elif throttled(conn, [(email_bucket('mail', row['email']), 3)]):
+                    outcome = 'throttled'
+                else:
+                    code = new_login_code()
+                    conn.execute('UPDATE jobsearch.mfa_challenges SET code_hash=%s,resends=resends+1 WHERE token_hash=%s',
+                                 (code_digest(row['user_id'], code), row['token_hash']))
+                    queue_mail(conn, 'login_code', row['email'], *render_login_code(code, MFA_CHALLENGE_SECONDS // 60))
+                    outcome = 'queued'
+            audit(conn, str(row['user_id']) if row else 'anonymous', 'login.mfa.resend', 'local', outcome)
+        if outcome == 'throttled':
+            raise RETRY_LATER
+        if outcome == 'exhausted':
+            raise HTTPException(429, 'No more codes can be sent for this sign-in. Enter your password again.', headers={'Retry-After': '300'})
+        if outcome == 'expired':
+            raise HTTPException(400, EXPIRED)
+        return {'detail': 'check your email'}
 
     return router
