@@ -3,6 +3,7 @@ import {useEffect,useState,type FormEvent,type ReactNode} from 'react';
 import {ShieldCheck,MailCheck,KeyRound,CircleCheck,TriangleAlert} from 'lucide-react';
 import {api,ApiError,describeError,safeNext,rememberNext,recallNext,stripParams,type Session} from './session';
 import {addressLabel} from './paths';
+import {accountScreen} from './account-screen.mjs';
 
 type Mode='signin'|'mfa'|'signup'|'forgot'|'inbox'|'verify'|'reset';
 type InboxKind='signup'|'reset'|'verify';
@@ -18,12 +19,15 @@ export default function SignIn({session,notice='',onSession}:{session:Session|nu
  const [resetToken,setResetToken]=useState(''),[resetState,setResetState]=useState<'form'|'done'|'invalid'>('form');
  const [next,setNext]=useState<string|null>(null);
  const [code,setCode]=useState(''),[useRecovery,setUseRecovery]=useState(false);
+ // On the public site sign-in is the hub's own screen (one for every product); the card links there and the screen comes back here.
+ const [screen,setScreen]=useState<{signIn:string;create:string}|null>(null);
  const signupEnabled=session?.signup_enabled===true;
 
  useEffect(()=>{
   const params=new URLSearchParams(window.location.search);
   const fromUrl=safeNext(params.get('next'));
   setNext(fromUrl||recallNext());if(fromUrl)rememberNext(fromUrl);
+  setScreen(accountScreen(window.location.href,fromUrl||recallNext()));
   const verifyToken=params.get('verify'),token=params.get('reset');
   if(verifyToken){
    stripParams('verify');setMode('verify');setVerifyState('pending');
@@ -111,7 +115,14 @@ export default function SignIn({session,notice='',onSession}:{session:Session|nu
  return <div className="signin-card"><div className="lock-icon">{icon}</div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2><p>{text}</p>
   {notice&&mode==='signin'&&<p className="message" role="status">{notice}</p>}
 
-  {mode==='signin'&&<form className="login-form" onSubmit={signIn}>
+  {mode==='signin'&&screen&&<div className="login-form">
+   <a className="primary" href={screen.signIn}>Sign in</a>
+   <div className="signin-links">{signupEnabled&&<a className="link-button" href={screen.create}>Create an account</a>}</div>
+   {next&&<p className="hint">After signing in you will continue to {addressLabel(next)}.</p>}
+   <p className="hint">Sign-in is one screen for every Bagala product. It brings you back here afterwards.</p>
+  </div>}
+
+  {mode==='signin'&&!screen&&<form className="login-form" onSubmit={signIn}>
    <label>Username or email<input autoComplete="username" autoCapitalize="none" spellCheck={false} required maxLength={254} value={username} onChange={e=>setUsername(e.target.value.toLowerCase())}/></label>
    <label>Password<input type="password" autoComplete="current-password" required maxLength={128} value={password} onChange={e=>setPassword(e.target.value)}/></label>
    {errorLine}
