@@ -22,7 +22,11 @@ export default function Observability({version}:{version:number}){
  const [checked,setChecked]=useState(''),[error,setError]=useState(''),[loaded,setLoaded]=useState(false),[expanded,setExpanded]=useState(false),[height,setHeight]=useState(600);
  const frame=useRef<HTMLDivElement>(null);
  const current=tools[tool],selected=current.screens[screen]||current.screens[0],path=selected[1],custom=path==='graphql-displays';
- const url=apiPath('/monitoring/')+tool+'/'+path;
+ // The tools are served from the ROOT of every name this page is on, and each is configured for
+ // that root (Grafana's root_url and Phoenix's host root path are /api/monitoring/<tool>): framed
+ // under /jobsearch/api/monitoring/... Grafana's own router answered "Page not found" for every
+ // dashboard (17 Sep 2026). The dashboard check below still goes through the API's own prefix.
+ const url='/api/monitoring/'+tool+'/'+path;
  useEffect(()=>{
   let cancelled=false;
   const check=async()=>{
