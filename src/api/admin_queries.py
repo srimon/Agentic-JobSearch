@@ -510,11 +510,13 @@ def gpu(days):
 # jobsearch api/worker/scheduler, Job Prep and Prometheus itself. There is no node exporter,
 # no cAdvisor and no kube-state-metrics, so host and container CPU, memory and disk are not
 # collected anywhere. The console says that instead of showing a machine figure it cannot get.
+# Each API copy is scraped as its own instance: usage sums across a job's copies, and a job counts as
+# up only when every copy is (the console keeps one row per job).
 PROMETHEUS_QUERIES = {
     'cpu_cores': 'sum by (job) (rate(process_cpu_seconds_total[5m])) or sum by (job) (rate(prep_process_cpu_seconds_total[5m]))',
     'memory_bytes': 'sum by (job) (process_resident_memory_bytes) or sum by (job) (prep_process_resident_memory_bytes)',
     'open_files': 'sum by (job) (process_open_fds) or sum by (job) (prep_process_open_fds)',
-    'up': 'up',
+    'up': 'min by (job) (up)',
 }
 PROMETHEUS_RANGE = 'sum(rate(process_cpu_seconds_total[5m])) + sum(rate(prep_process_cpu_seconds_total[5m]))'
 PROMETHEUS_NOTE = ('Prometheus in hub-observability, scraped every 15 seconds. It scrapes the five application '

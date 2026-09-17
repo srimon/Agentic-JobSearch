@@ -40,6 +40,10 @@ def application_summaries(conn, user_id, job_ids):
 
 @contextmanager
 def private_connection(user_id):
+    """The owner lives exactly as long as this block's transaction, so it can never reach whoever
+    uses the connection next. Under autocommit it would end with the first statement instead."""
     with connection() as c:
+        if c.autocommit:
+            raise RuntimeError('private_connection requires a transaction; the connection is in autocommit mode')
         c.execute("SELECT set_config('jobsearch.user_id',%s,true)",(str(user_id),))
         yield c

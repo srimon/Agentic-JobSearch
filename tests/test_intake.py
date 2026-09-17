@@ -134,6 +134,19 @@ def test_upload_guards_and_auth(client):
     app.dependency_overrides[current_user]=lambda:{**client.users[0],'roles':['operator']}
     assert client.get('/api/intake').status_code==403
 
+def test_resume_upload_stores_off_the_event_loop(client,monkeypatch):
+    import asyncio
+    from src.api import intake
+    places=[];original=intake.store_resume
+    def store(*args):
+        try:asyncio.get_running_loop();places.append('event loop')
+        except RuntimeError:places.append('worker thread')
+        return original(*args)
+    monkeypatch.setattr(intake,'store_resume',store)
+    assert upload(client).status_code==200
+    assert places==['worker thread']
+    assert client.get('/api/intake/resume/default').json()['text']==TEXT
+
 def test_company_resume_and_no_fake_submission(client):
     assert upload(client).status_code==200
     endpoint='/api/jobs/'+str(client.jid)+'/application-check'

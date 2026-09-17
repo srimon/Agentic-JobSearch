@@ -46,14 +46,15 @@ def timestamp(value):
 def prometheus():
     targets=get_json('prometheus','/api/v1/targets')['data']['activeTargets']
     names=['jobsearch_queue_ready','jobsearch_queue_running','jobsearch_queue_oldest_seconds','jobsearch_current_matches']
-    result=get_json('prometheus','/api/v1/query',{'query':'{__name__=~"'+'|'.join(names)+'"}'})
+    # Every API copy exports the same database gauges as its own instance: one value per name.
+    result=get_json('prometheus','/api/v1/query',{'query':'max by (__name__) ({__name__=~"'+'|'.join(names)+'"})'})
     if result.get('status')!='success':raise RuntimeError('Metric query failed')
     metrics={name:None for name in names}
     for item in result['data']['result']:
         key=item.get('metric',{}).get('__name__')
         if key in metrics:metrics[key]=number(item['value'][1])
     end=int(time.time())
-    history=get_json('prometheus','/api/v1/query_range',{'query':'jobsearch_queue_ready','start':end-3600,'end':end,'step':60})
+    history=get_json('prometheus','/api/v1/query_range',{'query':'max(jobsearch_queue_ready)','start':end-3600,'end':end,'step':60})
     if history.get('status')!='success':raise RuntimeError('History query failed')
     series=history['data']['result']
     samples=[{'at':number(v[0]),'value':number(v[1])} for v in (series[0]['values'] if series else [])][-61:]
@@ -87,7 +88,9 @@ def phoenix():
 
 def grafana():
     dashboard=get_json('grafana','/api/dashboards/uid/jobsearch-operations')['dashboard']
-    allowed={1:'jobsearch_current_matches',2:'jobsearch_enabled_sources',3:'jobsearch_queue_depth',4:'up{job=~"jobsearch-.*"}',5:'histogram_quantile(0.95, sum by (le) (rate(jobsearch_http_duration_seconds_bucket[5m])))',6:'sum by (outcome) (jobsearch_collection_runs_total)',7:'sum by (decision) (jobsearch_decisions_total)',8:'time()-jobsearch_source_last_success_seconds',9:'ALERTS{alertstate="firing"}'}
+    # Mirrors the dashboard's panels. The database gauges come from every API copy with the same value,
+    # so they drop the instance; panel 4 keeps it, one row per copy.
+    allowed={1:'max without (instance) (jobsearch_current_matches)',2:'max without (instance) (jobsearch_enabled_sources)',3:'max without (instance) (jobsearch_queue_depth)',4:'up{job=~"jobsearch-.*"}',5:'histogram_quantile(0.95, sum by (le) (rate(jobsearch_http_duration_seconds_bucket[5m])))',6:'sum by (outcome) (jobsearch_collection_runs_total)',7:'sum by (decision) (jobsearch_decisions_total)',8:'time()-max without (instance) (jobsearch_source_last_success_seconds)',9:'ALERTS{alertstate="firing"}'}
     end=int(time.time())
     def panel(item):
         ident=item['id'];history=item.get('type')=='timeseries'
@@ -99,7 +102,7 @@ def grafana():
             if result.get('status')!='success':raise RuntimeError('Query failed')
             for row in result['data']['result'][:25]:
                 tags=row.get('metric',{})
-                name=' / '.join(label(tags[k]) for k in ('job','outcome','decision','source_id','alertname') if k in tags) or 'Value'
+                name=' / '.join(label(tags[k]) for k in ('job','instance','outcome','decision','source_id','alertname') if k in tags) or 'Value'
                 samples=[{'at':number(v[0]),'value':number(v[1])} for v in row.get('values',[row['value']] if 'value' in row else [])][-61:]
                 payload['series'].append({'name':name,'samples':samples})
             payload['available']=True

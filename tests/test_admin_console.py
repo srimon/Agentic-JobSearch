@@ -124,7 +124,7 @@ class FakeMetrics:
         if path.endswith('query_range'):
             return [{'metric': {}, 'values': [[1789000000, '0.01'], [1789000060, '0.02']]}]
         expression = params['query']
-        if expression == 'up':
+        if expression == 'min by (job) (up)':
             return [{'metric': {'job': 'jobsearch-api'}, 'value': [1789000000, '1']}]
         if 'memory' in expression:
             return [{'metric': {'job': 'jobsearch-api'}, 'value': [1789000000, '134217728']}]
@@ -438,6 +438,15 @@ def test_gpu_says_it_is_not_enabled_until_samples_arrive(client, monkeypatch):
     console.clear_cache()
     enabled = client.get('/api/admin/machine').json()['gpu']
     assert enabled['enabled'] is True and enabled['samples'] == 120 and enabled['daily']
+
+
+def test_a_job_is_one_service_row_that_is_up_only_when_every_copy_is(client, sources):
+    signed_in(['administrator'])
+    _, metrics = sources
+    services = client.get('/api/admin/machine').json()['services']
+    assert ('/api/v1/query', {'query': 'min by (job) (up)'}) in metrics.calls
+    assert [service['job'] for service in services['services']] == ['jobsearch-api']
+    assert services['targets'] == services['targets_up'] == 1
 
 
 def test_the_machine_panel_states_what_is_not_measured(client):

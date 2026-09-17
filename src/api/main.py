@@ -2,6 +2,7 @@ import hashlib
 import secrets
 import uuid
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 from fastapi import FastAPI, Request, HTTPException, Depends, Query
@@ -9,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from src.settings import settings
-from src.db.store import connection, audit
+from src.db.store import connection, audit, open_pool, close_pool
 from src.applications.private import private_connection, decrypt, encrypt, application_summaries
 from src.applications.dismissals import dismissal_for
 from src.applications.archives import archive_for,require_active,archive_if_emailed
@@ -18,7 +19,20 @@ from src.applications.learning import current as learning_model,explain as learn
 from src.applications.job_filters import STATE_VALUES,TITLE_VALUES,facet_summary
 
 cfg=settings()
-app=FastAPI(title='Jobsearch',docs_url=None,redoc_url=None)
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    # The API is the only process with a connection pool (src/db/store.py). The worker, scheduler,
+    # mailer and scripts never start this application, so they keep direct connections.
+    open_pool()
+    try:
+        yield
+    finally:
+        close_pool()
+
+
+app=FastAPI(title='Jobsearch',docs_url=None,redoc_url=None,lifespan=lifespan)
 from src.auth.local import router as local_auth, cookie_options, on_cookie_domain
 app.include_router(local_auth)
 from src.observability import setup,event,HTTP,LATENCY

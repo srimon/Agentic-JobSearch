@@ -1,5 +1,7 @@
 import os
 os.environ.setdefault('JOBSEARCH_TELEMETRY','false')
+import json
+import pathlib
 import pytest
 from fastapi.testclient import TestClient
 from src.api.main import app,current_user
@@ -30,7 +32,11 @@ def test_missing_metrics_are_not_zero_and_targets_are_scoped(client,monkeypatch)
     def get(tool,path,params=None):
         assert tool=='prometheus'
         if path.endswith('/targets'):return {'data':{'activeTargets':[{'labels':{'job':'jobsearch-api'},'health':'up','lastScrape':'2026-09-12T00:00:00Z','lastScrapeDuration':.02,'lastError':'private upstream detail'},{'labels':{'job':'other-app'},'health':'up'}]}}
-        if path.endswith('/query'):return {'status':'success','data':{'result':[{'metric':{'__name__':'jobsearch_queue_ready'},'value':[1,'NaN']}]}}
+        # One value per metric however many API copies export it.
+        if path.endswith('/query'):
+            assert params=={'query':'max by (__name__) ({__name__=~"jobsearch_queue_ready|jobsearch_queue_running|jobsearch_queue_oldest_seconds|jobsearch_current_matches"})'}
+            return {'status':'success','data':{'result':[{'metric':{'__name__':'jobsearch_queue_ready'},'value':[1,'NaN']}]}}
+        assert params['query']=='max(jobsearch_queue_ready)'
         return {'status':'success','data':{'result':[]}}
     monkeypatch.setattr(monitor,'get_json',get)
     response=client.get('/api/observability/prometheus?url=http://malicious.invalid')
@@ -88,13 +94,38 @@ def test_grafana_fixed_queries_and_redacted_series(client,monkeypatch):
         assert tool=='grafana'
         if path.endswith('jobsearch-operations'):
             return {'dashboard':{'title':'Jobsearch Operations','panels':[{'id':1,'title':'Opportunities','targets':[{'expr':'arbitrary-query'}]},{'id':10,'title':'Raw logs'}]}}
-        assert params=={'query':'jobsearch_current_matches'}
+        assert params=={'query':'max without (instance) (jobsearch_current_matches)'}
         return {'status':'success','data':{'result':[{'metric':{'job':'jobsearch-worker','secret':'private-value'},'value':[1,'5']}]}}
     monkeypatch.setattr(monitor,'get_json',get)
     response=client.get('/api/observability/grafana');data=response.json()
     assert data['available'] and len(data['panels'])==1
     assert data['panels'][0]['series'][0]['samples'][0]['value']==5
     assert 'private-value' not in response.text
+
+def test_grafana_availability_keeps_one_row_per_api_copy(client,monkeypatch):
+    admin()
+    def get(tool,path,params=None):
+        if path.endswith('jobsearch-operations'):return {'dashboard':{'panels':[{'id':4,'title':'API and worker available','type':'stat'}]}}
+        assert params=={'query':'up{job=~"jobsearch-.*"}'}
+        return {'status':'success','data':{'result':[{'metric':{'job':'jobsearch-api','instance':'10.42.0.15:9108'},'value':[1,'1']},{'metric':{'job':'jobsearch-api','instance':'10.42.0.16:9108'},'value':[1,'0']}]}}
+    monkeypatch.setattr(monitor,'get_json',get)
+    series=client.get('/api/observability/grafana').json()['panels'][0]['series']
+    assert [(s['name'],s['samples'][0]['value']) for s in series]==[('jobsearch-api / 10.42.0.15:9108',1),('jobsearch-api / 10.42.0.16:9108',0)]
+
+def test_grafana_queries_mirror_the_provisioned_dashboard(monkeypatch):
+    provisioned=pathlib.Path(__file__).resolve().parents[1]/'infra/observability/grafana/dashboards/jobsearch.json'
+    dashboard=json.loads(provisioned.read_text())
+    sent=[]
+    def get(tool,path,params=None):
+        if path.endswith('jobsearch-operations'):return {'dashboard':dashboard}
+        sent.append(params['query'])
+        return {'status':'success','data':{'result':[]}}
+    monkeypatch.setattr(monitor,'get_json',get)
+    monitor.grafana()
+    panels={p['id']:p['targets'][0]['expr'] for p in dashboard['panels'] if p['id']!=10}
+    # Panel 4 alone is narrowed to Jobsearch's own targets; every other query is the panel's.
+    assert panels.pop(4)=='up'
+    assert sorted(sent)==sorted(list(panels.values())+['up{job=~"jobsearch-.*"}'])
 
 def test_grafana_panel_failure_is_explicit(client,monkeypatch):
     admin()

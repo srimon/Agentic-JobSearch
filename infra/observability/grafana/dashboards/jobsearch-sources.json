@@ -23,7 +23,7 @@
       "description": "All observed matches before personal filters and archives.",
       "targets": [
         {
-          "expr": "jobsearch_current_matches",
+          "expr": "max without (instance) (jobsearch_current_matches)",
           "refId": "A",
           "legendFormat": "{{job}}",
           "range": false,
@@ -75,7 +75,7 @@
       "description": "",
       "targets": [
         {
-          "expr": "jobsearch_enabled_sources",
+          "expr": "max without (instance) (jobsearch_enabled_sources)",
           "refId": "A",
           "legendFormat": "{{job}}",
           "range": false,
@@ -127,7 +127,7 @@
       "description": "",
       "targets": [
         {
-          "expr": "jobsearch_queue_ready",
+          "expr": "max without (instance) (jobsearch_queue_ready)",
           "refId": "A",
           "legendFormat": "Queued",
           "range": true,
@@ -179,7 +179,7 @@
       "description": "",
       "targets": [
         {
-          "expr": "jobsearch_queue_running",
+          "expr": "max without (instance) (jobsearch_queue_running)",
           "refId": "A",
           "legendFormat": "Running",
           "range": true,
@@ -231,7 +231,7 @@
       "description": "",
       "targets": [
         {
-          "expr": "jobsearch_queue_oldest_seconds",
+          "expr": "max without (instance) (jobsearch_queue_oldest_seconds)",
           "refId": "A",
           "legendFormat": "Age",
           "range": true,
@@ -283,7 +283,7 @@
       "description": "",
       "targets": [
         {
-          "expr": "time()-jobsearch_source_last_success_seconds",
+          "expr": "time()-max without (instance) (jobsearch_source_last_success_seconds)",
           "refId": "A",
           "legendFormat": "{{source_id}}",
           "range": true,

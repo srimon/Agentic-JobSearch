@@ -2,7 +2,7 @@
 import threading
 import uuid
 from contextlib import contextmanager
-from src.db.store import connection, audit
+from src.db.store import connection, direct_connection, audit
 from src.settings import settings
 
 class LeaseLost(Exception):
@@ -65,7 +65,9 @@ def claim(worker_id):
     """
     config = settings()
     # Do not keep a transaction open while collecting from external websites.
-    with connection() as gate:
+    # The provider lock is session-level and must end with its own connection, so the gate is
+    # never borrowed from a pool, even in a process that has opened one.
+    with direct_connection() as gate:
         gate.autocommit = True
         provider = None
         try:

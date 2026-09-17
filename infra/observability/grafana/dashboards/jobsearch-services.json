@@ -25,7 +25,7 @@
         {
           "expr": "up",
           "refId": "A",
-          "legendFormat": "{{job}}",
+          "legendFormat": "{{job}} {{instance}}",
           "range": false,
           "instant": true
         }
@@ -285,7 +285,7 @@
         {
           "expr": "process_resident_memory_bytes",
           "refId": "A",
-          "legendFormat": "{{job}}",
+          "legendFormat": "{{job}} {{instance}}",
           "range": true,
           "instant": false
         }
@@ -337,7 +337,7 @@
         {
           "expr": "rate(process_cpu_seconds_total[5m])",
           "refId": "A",
-          "legendFormat": "{{job}}",
+          "legendFormat": "{{job}} {{instance}}",
           "range": true,
           "instant": false
         }
@@ -387,7 +387,7 @@
       "description": "",
       "targets": [
         {
-          "expr": "jobsearch_database_metrics_up",
+          "expr": "min without (instance) (jobsearch_database_metrics_up)",
           "refId": "A",
           "legendFormat": "{{job}}",
           "range": false,

@@ -28,6 +28,17 @@ def origin_of(address):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=('.env','/run/secrets/app_env'), env_prefix='JOBSEARCH_', extra='ignore')
     database_url: str = ''
+    # Connection pool of the API process only (src/db/store.py open_pool, opened by the FastAPI
+    # lifespan). The worker, scheduler, mailer and scripts never open it. Each API copy holds at
+    # most max_size connections, so three copies hold at most 18. A borrower that waits longer than
+    # timeout, or arrives while max_waiting others wait (0 = unbounded), gets the same 503 as an
+    # unreachable database; anyio runs sync routes on 40 threads, hence 40.
+    database_pool_min_size: int = Field(default=1, ge=0)
+    database_pool_max_size: int = Field(default=6, ge=1)
+    database_pool_timeout_seconds: float = Field(default=5, gt=0)
+    database_pool_max_waiting: int = Field(default=40, ge=0)
+    database_pool_max_lifetime_seconds: float = Field(default=1800, gt=0)
+    database_pool_max_idle_seconds: float = Field(default=300, gt=0)
     data_management_enabled: bool = False
     maintenance_mode: bool = False
     origin: str = 'http://localhost:3105'

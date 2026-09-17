@@ -1,6 +1,6 @@
 import os
 import pytest
-from src.db.store import connection
+from src.db.store import connection, direct_connection
 from ai_core.agents.supervisor import enqueue,run_one
 
 @pytest.fixture
@@ -72,7 +72,8 @@ def test_observed_exclusion_retires_old_match_without_changing_owner_state(sourc
 
     @contextmanager
     def restricted():
-        with connection() as c:
+        # SET ROLE lasts for the session, so it only ever goes on a connection that closes after use.
+        with direct_connection() as c:
             c.autocommit = True
             c.execute('SET ROLE jobsearch_worker')
             c.autocommit = False
@@ -80,6 +81,7 @@ def test_observed_exclusion_retires_old_match_without_changing_owner_state(sourc
 
     monkeypatch.setattr(supervisor, 'connection', restricted)
     monkeypatch.setattr(leases, 'connection', restricted)
+    monkeypatch.setattr(leases, 'direct_connection', restricted)
     monkeypatch.setattr(supervisor, 'collect', lambda run: [sample('one', **rejected), sample('never-stored', **rejected)])
     assert run_one()
     with connection() as c:

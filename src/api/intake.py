@@ -10,6 +10,7 @@ import threading
 import uuid
 from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from src.applications.private import private_connection, encrypt, decrypt
 from src.applications.assessment import assess
@@ -86,8 +87,12 @@ def create_router(current_user):
         raw=await request.body()
         if len(raw)>MAX_BYTES: raise HTTPException(413,'Resume exceeds 5 MiB')
         text=await asyncio.to_thread(parse_upload,raw,extension)
-        with private_connection(user['id']) as c:
-            return store_resume(c,user['id'],variant,raw,extension,text,filename)
+        def save():
+            with private_connection(user['id']) as c:
+                return store_resume(c,user['id'],variant,raw,extension,text,filename)
+        # Blocking database work (and any wait for a pooled connection) stays off the event loop,
+        # on the same thread limiter as the synchronous routes.
+        return await run_in_threadpool(save)
 
     @router.get('/intake/resume/{variant}')
     def resume(variant:Variant,download:bool=False,user=Depends(member)):
