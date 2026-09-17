@@ -1,46 +1,42 @@
 'use client';
 import {useState,type FormEvent} from 'react';
-import {LogOut} from 'lucide-react';
 import Dialog from './Dialog';
-import {type User} from './session';
 import {withBase} from './paths';
+import {PRODUCT,SITE,SITE_TITLE} from './panel.mjs';
 
-const SITE='https://www.bagala.ai';
 const THANKS='Thank you. Your message has been sent.';
 
-/** Bagala header bar (BRAND.md): wordmark, main title, product name, Products, Help and the account control. */
-export function BrandHeader({user,hub,signingOut,onSignOut,ready=true}:{user:User|null|undefined;hub?:string;signingOut:boolean;onSignOut:()=>void;ready?:boolean}){
- return <header className="brand-header">
-  <div className="brand-left">
-   <a className="brand-wordmark" href={SITE+'/'}><span className="brand-mark" aria-hidden="true">B</span>Bagala</a>
-   <div className="brand-titles"><span className="brand-title">Enterprise Autonomous Agentic Products</span><span className="brand-product">Job Search</span></div>
+/** The standard header (BRAND.md, the public site): the "B" mark, the wordmark, the site title with the product's name under it. Nothing else: every selection lives in the left panel. */
+export function BrandHeader(){
+ return <header className="site-header">
+  <div className="wrap site-header__inner">
+   <a className="brand" href={SITE+'/'}><span className="brand__mark" aria-hidden="true">B</span><span>Bagala</span></a>
+   <span className="site-header__title">{SITE_TITLE}<span className="site-header__product">{PRODUCT}</span></span>
   </div>
-  <nav className="brand-actions" aria-label="Bagala">
-   {hub&&<a href={hub}>Products</a>}
-   <a href={SITE+'/help'}>Help</a>
-   {user?<span className="brand-account"><span className="brand-user" title={user.name}>{user.name}</span><button type="button" className="brand-button" disabled={signingOut} onClick={onSignOut}><LogOut size={15} aria-hidden/>{signingOut?'Signing out…':'Sign out'}</button></span>
-    :ready&&<a className="brand-button" href={withBase('/')}>Sign in</a>}
-  </nav>
  </header>;
 }
 
-/** Bagala footer (BRAND.md): Enquiries with the Email Admin dialog, three link columns and the copyright line. */
-export function BrandFooter(){
- const [open,setOpen]=useState(false);
- const columns:[string,[string,string][]][]=[
-  ['Code',[['Model API',SITE+'/model-api'],['Models',SITE+'/models'],['Documentation',SITE+'/docs'],['Model API Docs',SITE+'/docs/model-api']]],
-  ['Community',[['GitHub','https://github.com/srimon']]],
-  ['Terms & policies',[['Terms of Service',SITE+'/terms'],['Privacy Policy',SITE+'/privacy']]],
+/** The standard footer (BRAND.md, the public site): Enquiries with Email Admin, three link columns and the copyright line. */
+export function BrandFooter({onEnquiry}:{onEnquiry:()=>void}){
+ const columns:[string,string,[string,string][]][]=[
+  ['code','Code',[['Model API',SITE+'/model-api'],['Models',SITE+'/models'],['Documentation',SITE+'/docs'],['Model API Docs',SITE+'/docs/model-api']]],
+  ['community','Community',[['GitHub','https://github.com/srimon']]],
+  ['policies','Terms & policies',[['Terms of Service',SITE+'/terms'],['Privacy Policy',SITE+'/privacy']]],
  ];
- return <footer className="brand-footer">
-  <div className="brand-enquiries"><span>Enquiries</span><button type="button" className="brand-button" onClick={()=>setOpen(true)}>Email Admin</button></div>
-  <div className="brand-columns">{columns.map(([title,items])=><div key={title}><h2>{title}</h2><ul>{items.map(([label,href])=><li key={label}><a href={href}>{label}</a></li>)}</ul></div>)}</div>
-  <p className="brand-copyright">© 2026 Bagala.ai. All rights reserved.</p>
-  {open&&<EnquiryDialog onClose={()=>setOpen(false)}/>}
+ return <footer className="site-footer">
+  <div className="wrap">
+   <div className="footer-enquiries">
+    <div><h2>Enquiries</h2><p>Questions about our products, your account or access for your organisation? Send us a message.</p></div>
+    <button className="btn btn-primary" type="button" onClick={onEnquiry}>Email Admin</button>
+   </div>
+   <div className="footer-cols">{columns.map(([id,title,items])=><nav key={id} aria-labelledby={'footer-'+id}><h2 id={'footer-'+id}>{title}</h2><ul>{items.map(([label,href])=><li key={label}><a href={href} rel={href.startsWith(SITE)?undefined:'noopener'}>{label}</a></li>)}</ul></nav>)}</div>
+   <p className="footer-copy">© 2026 Bagala.ai. All rights reserved.</p>
+  </div>
  </footer>;
 }
 
-function EnquiryDialog({onClose}:{onClose:()=>void}){
+/** The Email Admin dialog, opened from the panel or the footer: Name, Email, Message and the honeypot, posted to /__hub/enquiries on this origin. */
+export function EnquiryDialog({onClose}:{onClose:()=>void}){
  const [name,setName]=useState(''),[email,setEmail]=useState(''),[message,setMessage]=useState(''),[website,setWebsite]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[sent,setSent]=useState(false);
  async function submit(e:FormEvent){
@@ -56,12 +52,14 @@ function EnquiryDialog({onClose}:{onClose:()=>void}){
   finally{setBusy(false)}
  }
  return <Dialog labelledBy="enquiry-title" onClose={()=>{if(!busy)onClose()}}>
-  <span className="eyebrow">ENQUIRIES</span><h2 id="enquiry-title">Email Admin</h2>
+  <span className="eyebrow eyebrow--account">Enquiries</span><h2 id="enquiry-title">Email Admin</h2>
+  <p className="muted">Send a message to the Bagala team. We reply to the email address you give.</p>
   {sent?<><p className="message" role="status">{THANKS}</p><div className="account-actions"><button type="button" className="primary" onClick={onClose}>Close</button></div></>:
   <form className="account-form" onSubmit={submit}>
    <label>Name<input required maxLength={120} autoComplete="name" value={name} onChange={e=>setName(e.target.value)}/></label>
    <label>Email<input type="email" required maxLength={254} autoComplete="email" value={email} onChange={e=>setEmail(e.target.value)}/></label>
    <label>Message<textarea required minLength={10} maxLength={2000} rows={6} value={message} onChange={e=>setMessage(e.target.value)}/></label>
+   <p className="hint">Between 10 and 2,000 characters.</p>
    <div className="brand-honeypot" aria-hidden="true"><label>Company website<input tabIndex={-1} autoComplete="off" value={website} onChange={e=>setWebsite(e.target.value)} name="company_website"/></label></div>
    {error&&<p className="message error" role="alert">{error}</p>}
    <div className="account-actions"><button className="primary" disabled={busy}>{busy?'Sending…':'Send message'}</button><button type="button" className="secondary" disabled={busy} onClick={onClose}>Cancel</button></div>

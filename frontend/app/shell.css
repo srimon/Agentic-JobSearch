@@ -1,0 +1,194 @@
+/* The Bagala standard shell (17 Sep 2026): the header with the mark, the wordmark and the site title; a left panel
+   flush with the viewport's left edge holding every selection, one dark accent per group; the right pane taking the
+   remaining width and showing only the chosen screen; the footer; the option and step rows with their animated icons.
+   Copied from the public site's platform/gateway/welcome/assets/bagala.css (tokens identical) until the hub publishes
+   platform/brand/shell.css; the product's own additions are marked at the end of each block. System fonts only. */
+:root{
+  /* The gold family, light to deep. Each shade has one job so the eye can tell the areas apart. */
+  --gold-100:#FFFAEB;   /* cream: cards, panels, dialogs, inputs */
+  --gold-200:#FBF1D2;   /* pale: alternate bands, hover */
+  --gold-300:#F5E4A8;   /* page ground */
+  --gold-400:#EED58A;   /* the left panel and the footer */
+  --gold-500:#E4C463;   /* honey: the chosen entry, step marks */
+  --gold-600:#DDB449;   /* header gradient end */
+  --gold-700:#C99A2E;   /* header gradient start */
+  --gold-800:#9C7420;   /* bronze: strong rules and markers, never text */
+  /* Brand names for the same values (BRAND.md, the maintenance page, the products) */
+  --bg-gold:#F5E4A8;
+  --bg-gold-deep:#EED58A;
+  --header-gold:#C99A2E;
+  --header-gold-2:#DDB449;
+  --surface:#FFFAEB;
+  --surface-2:#FBF1D2;
+  /* Text: dark shades only. Body ink, a darker ink for block (uppercase) labels, a dark brown for secondary copy. */
+  --ink:#1D180C;
+  --ink-block:#0F0C05;
+  --ink-muted:#4A3B16;
+  --line:#D9BF6E;
+  --line-strong:#9C7420;
+  --primary:#1D180C;
+  --primary-ink:#F7DB85;
+  --focus:#6E5200;
+  --ok:#2E6B2F; --warn:#8A5A00; --danger:#9B2C1F;
+  /* One dark accent per panel group: labels and links take the group's colour. Each is at least 7:1 on --gold-400. */
+  --accent-start:#0B3D1C;
+  --accent-relax:#083A45;
+  --accent-jobs:#241B5C;
+  --accent-docs:#4B2A0A;
+  --accent-account:#5B0F1B;
+  --accent-tools:#1E2A3B;
+  --accent-page:#0F0C05;
+  /* The product's own group (Job Search): a deep plum, 10.6:1 on the panel and 9.1:1 on the honey shade. */
+  --accent-product:#3F0E47;
+  --radius:10px;
+  --font:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
+  --side:288px;
+  --measure:80ch;
+  --gutter:clamp(16px,3vw,40px);
+  --shadow:0 1px 2px rgba(29,24,12,.06),0 8px 24px rgba(29,24,12,.07);
+  color-scheme:light;
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:24px}
+img,svg{max-width:100%}
+:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:4px}
+h1,h2,h3{line-height:1.15;letter-spacing:-.015em;text-wrap:balance;color:var(--ink-block)}
+/* An application layout, edge to edge: the header, the shell and the footer span the whole viewport. */
+.wrap{width:100%;padding-inline:var(--gutter)}
+[hidden]{display:none!important}
+.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.skip{position:absolute;left:16px;top:-60px;z-index:100;background:var(--primary);color:var(--primary-ink);padding:10px 16px;border-radius:var(--radius);font-weight:600;text-decoration:none}
+.skip:focus{top:12px}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 20px;border-radius:var(--radius);border:1px solid transparent;font:600 15px/1.2 var(--font);text-decoration:none;cursor:pointer;white-space:nowrap;transition:background-color .15s ease,color .15s ease,border-color .15s ease,transform .15s ease}
+.btn-primary{background:var(--primary);color:var(--primary-ink);border-color:var(--primary)}
+.btn-primary:hover{background:#3a3018;border-color:#3a3018}
+.btn-secondary{background:transparent;color:var(--ink);border-color:var(--ink)}
+.btn-secondary:hover{background:var(--gold-100)}
+.btn-sm{min-height:38px;padding:8px 14px;font-size:14px}
+.btn:disabled{opacity:.6;cursor:wait}
+
+/* Header: the brand and the site title, full width. Every selection lives in the left panel. */
+.site-header{background:linear-gradient(90deg,var(--gold-700),var(--gold-600));color:var(--ink);border-bottom:1px solid rgba(29,24,12,.18);position:relative;z-index:4}
+.site-header__inner{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;min-height:64px;padding-block:8px}
+.brand{display:inline-flex;align-items:center;gap:10px;color:var(--ink-block);text-decoration:none;font-weight:700;font-size:19px;letter-spacing:-.01em}
+.brand__mark{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:8px;background:var(--primary);color:var(--primary-ink);font-size:18px;font-weight:800;line-height:1}
+.site-header__title{font-size:16px;font-weight:700;padding-left:18px;border-left:1px solid rgba(29,24,12,.35);line-height:1.3;color:var(--ink-block)}
+.site-header__product{display:block;font-size:12px;font-weight:600;color:var(--ink)}
+@media (max-width:440px){.site-header__title{padding-left:12px;font-size:15px}}
+
+/* The shell: the left panel flush with the viewport's left edge, the right pane taking all the remaining width */
+.shell{display:grid;grid-template-columns:var(--side) minmax(0,1fr);width:100%;flex:1}
+.side{background:var(--gold-400);border-right:1px solid var(--line);min-width:0;min-height:100%}
+.side__toggle{display:none}
+.side__nav{position:sticky;top:0;max-height:100vh;overflow-y:auto;overscroll-behavior:contain;padding:18px 14px 28px}
+.side__group{padding:10px 0 12px;border-top:1px solid rgba(29,24,12,.14)}
+.side__group:first-child{border-top:0;padding-top:0}
+.side__group--start{--group-accent:var(--accent-start)}
+.side__group--relax{--group-accent:var(--accent-relax)}
+.side__group--jobs{--group-accent:var(--accent-jobs)}
+.side__group--docs{--group-accent:var(--accent-docs)}
+.side__group--account{--group-accent:var(--accent-account)}
+.side__group--tools{--group-accent:var(--accent-tools)}
+.side__group--page{--group-accent:var(--accent-page)}
+.side__group--product{--group-accent:var(--accent-product)}
+.side__group--data{--group-accent:var(--accent-tools)}
+.side__label{font-size:12.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--group-accent);margin:0 12px 6px}
+/* Sub-groups inside an entry (Products > Relax, Job; Job Search > Data management): a thin rule, the sub-group's own accent */
+.side__sub{margin:4px 0 6px 18px;padding-left:10px;border-left:2px solid rgba(29,24,12,.16)}
+.side__sub .side__label{font-size:11.5px;margin:6px 12px 2px}
+.side__sublabel{font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--group-accent);margin:12px 12px 4px}
+.side__list{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.side__list a,.side__button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--group-accent);font:600 15px/1.35 var(--font);text-align:left;text-decoration:none;cursor:pointer}
+.side__list a:hover,.side__button:hover{background:var(--gold-200);border-color:var(--line)}
+.side__list a[aria-current="page"],.side__button[aria-current="page"]{background:var(--gold-500);color:var(--ink-block);box-shadow:inset 4px 0 0 var(--group-accent)}
+.side__list a[aria-current="page"] .side__num{background:var(--group-accent);color:var(--gold-100)}
+.side__button:disabled{opacity:.6;cursor:wait}
+.side__num{flex:0 0 24px;display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--gold-100);border:1px solid var(--group-accent);color:var(--group-accent);font-size:12px;font-weight:800;line-height:1}
+.side__ext{margin-left:auto;font-size:12px;opacity:.8}
+.side__note{margin:6px 12px 0;font-size:13px;color:var(--ink-muted)}
+.side__name{display:block;padding:6px 12px 2px;font-weight:700;color:var(--ink-block);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.side__error{margin:4px 12px 0;font-size:13px;font-weight:600;color:var(--danger)}
+/* Every panel entry carries a small code-drawn icon with the same calm motion as the option rows */
+.side__icon{flex:0 0 20px;width:20px;height:20px;display:grid;place-items:center}
+.side__icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;transform-box:fill-box;transform-origin:center}
+.pane{min-width:0;width:100%;padding:0 0 clamp(40px,6vw,72px)}
+.pane > *{padding-inline:var(--gutter)}
+@media (max-width:900px){
+  .shell{grid-template-columns:1fr}
+  .side{border-right:0;border-bottom:1px solid var(--line);min-height:0}
+  .side__toggle{display:flex;align-items:center;gap:10px;list-style:none;cursor:pointer;padding:12px var(--gutter);font-weight:700;color:var(--ink-block);background:var(--gold-500);border-bottom:1px solid var(--line)}
+  .side__toggle::-webkit-details-marker{display:none}
+  .side__toggle::before{content:"";width:18px;height:2px;background:var(--ink-block);box-shadow:0 -6px 0 var(--ink-block),0 6px 0 var(--ink-block)}
+  .side[open] .side__toggle::before{box-shadow:none;transform:rotate(45deg)}
+  .side__nav{position:static;max-height:none;padding:12px var(--gutter) 20px}
+}
+
+/* Block labels (uppercase) are set darker than body text, never in the muted shade */
+.eyebrow{display:inline-block;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-block);margin-bottom:12px}
+.eyebrow--start{color:var(--accent-start)}
+.eyebrow--relax{color:var(--accent-relax)}
+.eyebrow--jobs{color:var(--accent-jobs)}
+.eyebrow--docs{color:var(--accent-docs)}
+.eyebrow--account{color:var(--accent-account)}
+.eyebrow--tools{color:var(--accent-tools)}
+.eyebrow--product{color:var(--accent-product)}
+.eyebrow--data{color:var(--accent-tools)}
+
+/* Ordered guides: vertical steps, one full-width row each - the number, an animated icon, the title, the text */
+.guide{list-style:none;margin:0;padding:0;counter-reset:guide;display:grid;grid-template-columns:1fr;gap:12px}
+.guide > li{counter-increment:guide;position:relative;display:flex;align-items:flex-start;gap:14px;width:100%;padding:14px 18px 14px 62px;background:var(--gold-100);border:1px solid var(--line);border-radius:12px}
+.guide > li::before{content:counter(guide);position:absolute;left:16px;top:14px;width:32px;height:32px;border-radius:50%;display:grid;place-items:center;background:var(--gold-500);border:1px solid var(--line-strong);color:var(--ink-block);font-weight:800;font-size:15px}
+.guide__icon{margin-top:1px}
+.guide__body{flex:1;min-width:0}
+.guide__body > strong{display:block;font-size:17px;color:var(--ink-block);margin-bottom:4px}
+.guide p{margin:0 0 6px;color:var(--ink)}
+
+/* Options: one per row across the pane, an animated icon, the label and its description */
+.options{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.option{display:flex;align-items:center;gap:16px;width:100%;padding:16px 18px;background:var(--gold-100);border:1px solid var(--line);border-radius:12px;text-decoration:none;color:var(--ink);transition:border-color .15s ease,background-color .15s ease}
+.option:hover{border-color:var(--ink);background:#fffdf5}
+.option__icon{flex:0 0 32px;width:32px;height:32px;display:grid;place-items:center}
+.option__icon svg{width:30px;height:30px;fill:none;stroke:var(--ink-block);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;transform-box:fill-box;transform-origin:center}
+.option__icon--sm{flex-basis:20px;width:20px;height:20px}
+.option__icon--sm svg{width:18px;height:18px;stroke:currentColor}
+.option__body{display:grid;gap:2px;min-width:0}
+.option__body strong{font-size:17px;color:var(--ink-block)}
+.option__body span{color:var(--ink-muted);font-size:15px}
+/* One calm motion per icon kind, 2-6 s cycles. The owner's decision (17 Sep 2026): these run for everyone, reduced-motion
+   settings included; they are slow and decorative. Only transitions and smooth scrolling yield (the block at the end). */
+.option__icon--pulse svg{animation:opt-pulse 3s ease-in-out infinite}
+.option__icon--sway svg{animation:opt-sway 4s ease-in-out infinite}
+.option__icon--spin svg{animation:opt-spin 6s linear infinite}
+.option__icon--nudge svg{animation:opt-nudge 2.5s ease-in-out infinite}
+.option__icon--bounce svg{animation:opt-bounce 2.5s ease-in-out infinite}
+.option__icon--orbit svg{animation:opt-orbit 5s ease-in-out infinite}
+.option__icon--wiggle svg{animation:opt-wiggle 3.5s ease-in-out infinite}
+@keyframes opt-pulse{50%{transform:scale(1.12)}}
+@keyframes opt-sway{25%{transform:rotate(-7deg)}75%{transform:rotate(7deg)}}
+@keyframes opt-spin{to{transform:rotate(360deg)}}
+@keyframes opt-nudge{50%{transform:translateX(3px)}}
+@keyframes opt-bounce{50%{transform:translateY(-3px)}}
+@keyframes opt-orbit{25%{transform:translate(2px,-2px)}75%{transform:translate(-2px,2px)}}
+@keyframes opt-wiggle{20%{transform:rotate(-8deg)}40%{transform:rotate(6deg)}60%{transform:rotate(-4deg)}80%{transform:rotate(2deg)}}
+
+/* Footer, full width */
+.site-footer{background:var(--gold-400);border-top:1px solid var(--line);padding-block:40px 28px;font-size:15px;position:relative;z-index:2}
+.footer-enquiries{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:16px 24px;padding-bottom:28px;border-bottom:1px solid var(--line-strong)}
+.footer-enquiries h2{font-size:20px;font-weight:750;margin:0}
+.footer-enquiries p{color:var(--ink-muted);margin:4px 0 0}
+.footer-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;padding-block:28px;border-bottom:1px solid var(--line-strong)}
+@media (max-width:640px){.footer-cols{grid-template-columns:1fr}}
+.footer-cols h2{font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-block);margin:0 0 10px}
+.footer-cols ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.footer-cols a{color:var(--ink);text-decoration:none}
+.footer-cols a:hover{text-decoration:underline}
+.footer-copy{text-align:center;padding-top:22px;margin:0;color:var(--ink-muted);font-size:14px}
+
+/* The owner's decision (17 Sep 2026): the decorative motions - the option and step icons, the panel icons - run for
+   everyone, reduced-motion settings included; they are slow and calm. Only transitions and smooth scrolling yield. */
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{transition:none!important}
+}

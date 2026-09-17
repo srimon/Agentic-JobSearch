@@ -11,7 +11,7 @@
 .ac-toolbar{display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
 .ac-toolbar>div:first-child{flex:1;min-width:220px}
 .ac-toolbar p{margin:8px 0 0;color:var(--muted);line-height:1.6;max-width:70ch}
-.ac-toolbar label{display:grid;gap:6px;font-size:12px;font-weight:600;color:var(--muted)}
+.ac-toolbar label{display:grid;gap:6px;font-size:12px;font-weight:700;color:var(--ink-block)}
 .ac-toolbar select{padding:10px 12px;border:1px solid var(--input-line);border-radius:7px;background:var(--input-bg);color:var(--ink);font-weight:400;max-width:100%}
 .ac-check{flex-direction:row;align-items:center;display:flex!important;gap:8px;color:var(--ink);padding-bottom:10px}
 .ac-check input{width:16px;height:16px;accent-color:var(--eyebrow)}
@@ -133,7 +133,7 @@
 .ac-table{overflow-x:auto;border:1px solid var(--line);border-radius:10px}
 .ac-table table{border-collapse:collapse;width:100%;font-size:12px}
 .ac-table th,.ac-table td{text-align:left;padding:11px 13px;border-bottom:1px solid var(--line);vertical-align:top;white-space:normal}
-.ac-table th{text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-size:12px;white-space:nowrap}
+.ac-table th{text-transform:uppercase;letter-spacing:1px;color:var(--ink-block);font-weight:800;font-size:12px;white-space:nowrap}
 .ac-table tr:last-child td{border-bottom:0}
 .ac-table code{overflow-wrap:anywhere;font-size:12px}
 .ac-pill{display:inline-block;padding:3px 9px;border-radius:12px;font-size:12px;background:var(--surface-2)}
@@ -159,11 +159,13 @@
  .ac-strip{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
 }
 
-/* A card arrives with a short rise. Anyone who has asked for less motion gets none: no draw-in, no
-   transition, the chart is simply there. */
-@media(prefers-reduced-motion:no-preference){
- .ac-card,.ac-strip-card{animation:ac-arrive .28s ease-out both}
- .ac-bar-fill,.ac-stack-part{transition:width .3s ease-out}
- .ac-strip-card{transition:border-color .15s ease-out,background .15s ease-out}
- @keyframes ac-arrive{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-}
+/* A card arrives with a short rise. The motion runs for everyone (the owner's decision, 17 Sep 2026); the
+   shell's reduced-motion block stops transitions only. */
+.ac-card,.ac-strip-card{animation:ac-arrive .28s ease-out both}
+.ac-bar-fill,.ac-stack-part{transition:width .3s ease-out}
+.ac-strip-card{transition:border-color .15s ease-out,background .15s ease-out}
+@keyframes ac-arrive{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* The panel headings' icons and the product cards' icons: the shell's animated icons, sized for the console. */
+.ac-panel h2{font-family:var(--font);font-weight:750}.ac-card h3{font-family:var(--font);font-weight:750;color:var(--ink-block)}.ac-quality h2{font-family:var(--font);font-weight:750}
+.ac-spark strong,.ac-figures strong{font-family:var(--font);font-weight:800;color:var(--ink-block)}
+.ac-measured summary{color:var(--accent-product)}.ac-check input{accent-color:var(--accent-product)}

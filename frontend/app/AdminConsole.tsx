@@ -23,8 +23,9 @@
  * tested on its own (frontend/tests/admin-charts.test.mjs).
  */
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {Activity, Cpu, Gauge, Info, RefreshCw, TriangleAlert, Users, Wallet} from 'lucide-react';
+import {Gauge, Info, RefreshCw, TriangleAlert} from 'lucide-react';
 import './admin-console.css';
+import {MotionIcon, type IconName, type Motion} from './Icons';
 import {api, describeError} from './session';
 import {barRows, CHART_BOX, funnelBars, labelIndexes, shapeSeries, sparkline, stackSegments} from './admin-charts.mjs';
 
@@ -184,9 +185,10 @@ function Card({title,note,children,wide}:{title:string;note?:React.ReactNode;chi
   <h3>{title}</h3>{children}{note?<p className="ac-caption">{note}</p>:null}</article>;
 }
 
-function Panel({icon,title,body,children}:{icon:React.ReactNode;title:string;body:Base;children:React.ReactNode}){
+/** A panel's heading carries a code-drawn icon with one calm motion, as every heading of a list of panels does in the standard shell. */
+function Panel({icon,motion,title,body,children}:{icon:IconName;motion:Motion;title:string;body:Base;children:React.ReactNode}){
  return <section className="ac-panel" aria-labelledby={'ac-'+body.panel}>
-  <header><span className="ac-icon" aria-hidden="true">{icon}</span>
+  <header><span className="ac-icon"><MotionIcon name={icon} motion={motion}/></span>
    <div><h2 id={'ac-'+body.panel}>{title}</h2>
     <p className="ac-source">Source: {body.source}{body.fresh_at?' · newest record '+when(body.fresh_at):''}</p></div>
   </header>
@@ -268,7 +270,7 @@ function TrafficPanel({body,product,products,bots}:{body:Traffic;product:string;
   .map(row=>({key:s(row,'host')+s(row,'path_group'),label:(one?'':nameFor(s(row,'host'),products)+' ')+s(row,'path_group'),
    value:n(row,'p95_ms'),text:num(n(row,'p95_ms'))+' ms · avg '+num(n(row,'avg_ms'))+' ms'})),[body.slowest,one,product,products]);
  const scope=one?nameFor(product,products):'every product';
- return <Panel icon={<Activity size={18}/>} title="Web traffic" body={body}>
+ return <Panel icon="chart" motion="bounce" title="Web traffic" body={body}>
   <Card title={'Requests per day · '+scope}
    note={<>Requests from people, one line per product. {bots?'The dashed line is bot traffic.':'Bots are excluded; turn on “Show bots” to draw them.'}</>}>
    <Chart title="Requests per day" series={requests} labels={labels}/></Card>
@@ -325,7 +327,7 @@ function AccountsPanel({body}:{body:Accounts}){
   {key:'verified',label:'Verified',value:totals?.verified||0},
   {key:'unverified',label:'Not verified',value:Math.max(0,(totals?.accounts||0)-(totals?.verified||0))},
  ];
- return <Panel icon={<Users size={18}/>} title="Accounts" body={body}>
+ return <Panel icon="signin" motion="wiggle" title="Accounts" body={body}>
   <Card title="Sign-ups per day" note="A sign-up is a self-service account. The dashed line is every account created, console and seed accounts included, and is only there for comparison.">
    <Chart title="Sign-ups per day" series={signups} labels={labels} empty="No account was created in this range."/></Card>
   <Card title="Sign-in attempts per day" note="Recorded sign-in attempts by outcome, every account included.">
@@ -373,7 +375,7 @@ function MonetizationPanel({body,product,products}:{body:Money;product:string;pr
  const marks=one?{'Sign-ups':'all products','Verified':'all products','Signed in':'all products'}:undefined;
  const days=useMemo(()=>[...new Set((body.enquiries||[]).map(row=>s(row,'day')))].sort(),[body.enquiries]);
  const enquiries=useMemo(()=>[{key:'enquiries',label:'Enquiries',values:daySeries(body.enquiries||[],days,'enquiries'),tone:1}],[body.enquiries,days]);
- return <Panel icon={<Wallet size={18}/>} title="Conversion and usage" body={body}>
+ return <Panel icon="check" motion="pulse" title="Conversion and usage" body={body}>
   <Card title={'From a visit to a signed-in account · '+(one?nameFor(product,products):'every product')}
    note={<>{body.funnel_note} {one?'Only the first step can be read per product: an account is not tied to one.':''}</>}>
    <Funnel steps={funnel} marks={marks}/></Card>
@@ -408,7 +410,7 @@ function MachinePanel({body}:{body:Machine}){
  const memory=(services.services||[]).map(service=>({key:service.job,label:service.job,value:service.memory_mb||0,
   text:num(service.memory_mb,1)+' MB'})).sort((left,right)=>right.value-left.value);
  const gpuDaily=(gpu.daily||[]).map(row=>n(row,'avg_utilisation'));
- return <Panel icon={<Cpu size={18}/>} title="Machine" body={body}>
+ return <Panel icon="orbit" motion="spin" title="Machine" body={body}>
   <Card title="Service CPU, last hour" note={services.available?'Every scraped service together, one sample a minute.':undefined}>
    {services.available?<Spark values={samples} label="Service CPU cores over the last hour" unit=" cores"
     empty="Prometheus answered, but it has no range for this expression yet."/>:<NoChart>{services.message}</NoChart>}</Card>
@@ -452,11 +454,13 @@ function Strip({traffic,money,accounts,products,product,onChoose,bots}:
   return row?n(row,'visitors'):0;
  };
  const cards=[{host:ALL,name:'All products',kind:'all'},...hosts];
+ // A choice list: each card carries a code-drawn icon with its calm motion, chosen by what the host is.
+ const cardIcon=(item:{name:string;kind:string;host:string}):[IconName,Motion]=>item.host===ALL?['grid','orbit']:item.kind==='site'?['globe','spin']:/book|library|read/i.test(item.name)?['book','sway']:/prep|interview|training/i.test(item.name)?['chat','pulse']:/job/i.test(item.name)?['search','orbit']:['cursor','nudge'];
  return <><div className="ac-strip" role="group" aria-label="Choose a product">
   {cards.map(item=><button key={item.host} type="button" aria-pressed={product===item.host}
    className={'ac-strip-card'+(product===item.host?' ac-strip-on':'')+(item.kind==='site'?' ac-strip-site':'')}
    onClick={()=>onChoose(item.host)}>
-   <span className="ac-strip-name">{item.name}</span>
+   <span className="ac-strip-name"><MotionIcon name={cardIcon(item)[0]} motion={cardIcon(item)[1]} small/>{item.name}</span>
    <span className="ac-strip-host">{item.host===ALL?'every host below':item.host}</span>
    <span className="ac-strip-rows">
     <span><i>Visits</i><b className="ac-num">{num(item.host===ALL?traffic.totals?.[bots?'all_hits':'human_hits']:visits(item.host))}</b></span>
@@ -503,7 +507,7 @@ export default function AdminConsole({version}:{version:number}){
  const cadence=minutes%60?minutes+' minutes':minutes===60?'hour':minutes/60+' hours';
  return <div className="admin-console">
   <div className="ac-toolbar">
-   <div><span className="eyebrow">ADMINISTRATOR CONSOLE</span>
+   <div><span className="eyebrow eyebrow--product">Administrator console</span>
     <p>Traffic, accounts, conversion and machine load for every Bagala product, as charts, from the shared warehouse and the cluster&rsquo;s own metrics.</p></div>
    <label>Date range<select aria-label="Date range" value={days} onChange={event=>setDays(Number(event.target.value))}>
     {(data?.ranges||[7,30,90]).map(value=><option key={value} value={value}>{RANGE_LABEL[value]||value+' days'}</option>)}</select></label>
