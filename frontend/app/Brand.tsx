@@ -2,16 +2,20 @@
 import {useState,type FormEvent} from 'react';
 import Dialog from './Dialog';
 import {withBase} from './paths';
-import {PRODUCT,SITE,SITE_TITLE} from './panel.mjs';
+import {SITE,SITE_TITLE} from './panel.mjs';
 
 const THANKS='Thank you. Your message has been sent.';
 
-/** The standard header (BRAND.md, the public site): the "B" mark, the wordmark, the site title with the product's name under it ('Admin' on an admin view). Nothing else: every selection lives in the left panel. */
-export function BrandHeader({product=PRODUCT}:{product?:string}){
+/**
+ * The standard header (BRAND.md, the public site): the "B" mark, the wordmark, the site title with the product's name
+ * under it ('Admin' on an admin view; no product line at all until the page knows which view the address names, so
+ * the first paint never says 'Job Search' on an admin address). Nothing else: every selection lives in the left panel.
+ */
+export function BrandHeader({product}:{product?:string|null}){
  return <header className="site-header">
   <div className="wrap site-header__inner">
    <a className="brand" href={SITE+'/'}><span className="brand__mark" aria-hidden="true">B</span><span>Bagala</span></a>
-   <span className="site-header__title">{SITE_TITLE}<span className="site-header__product">{product}</span></span>
+   <span className="site-header__title">{SITE_TITLE}{product?<span className="site-header__product">{product}</span>:null}</span>
   </div>
  </header>;
 }

@@ -235,3 +235,36 @@ test('app/panel.json is byte-identical to the hub\'s platform/brand/panel.json w
   }
   assert.equal(readFileSync(new URL('../app/panel.json', import.meta.url), 'utf8'), readFileSync(file, 'utf8'));
 });
+
+test('nothing wrong paints before hydration: the page names no product, no group and no screen until the address\'s ?view= has been read', () => {
+  const page = readFileSync(new URL('../app/page.tsx', import.meta.url), 'utf8');
+  assert.match(page, /const \[viewReady,setViewReady\]=useState\(false\)/, 'viewReady starts false on the server and the client alike');
+  assert.doesNotMatch(page, /useState\([^)]*typeof window/, 'no initial state reads the window: that would mismatch on hydration');
+  const effect = page.split('\n').find((line) => line.includes("params.get('view')") && line.includes('setTab('));
+  assert.ok(effect, 'the mount effect that reads ?view=');
+  assert.match(effect, /^ useEffect\(\(\)=>\{const params=new URLSearchParams\(window\.location\.search\);/);
+  assert.match(effect, /\}setViewReady\(true\)\},\[\]\);\s*$/, 'the same effect declares the view ready, last, after the tab is set');
+  assert.equal((page.match(/setViewReady\(true\)/g) || []).length, 1, 'and nothing else does');
+  assert.match(page, /<BrandHeader product=\{viewReady\?\(groupLabel==='Account'\?PRODUCT:groupLabel\):null\}\/>/, 'the header carries a product line only once the view is known');
+  assert.match(page, /<SidePanel [^>]*viewReady=\{viewReady\}/, 'the panel is told');
+  assert.match(page, /className="page-heading page-arrival">\{viewReady\?<div><div className=\{'eyebrow eyebrow--'\+group\}>\{groupLabel\}<\/div><h1>\{labels\[tab\]\}<\/h1>/, 'the pane\'s eyebrow and heading wait');
+  assert.match(page, /\{viewReady&&\['matches','emailed'\]\.includes\(tab\)&&<SearchOverview/, 'so does the search overview');
+  const panel = readFileSync(new URL('../app/SidePanel.tsx', import.meta.url), 'utf8');
+  assert.match(panel, /const groups=\(viewReady\?panelGroups\(\{user:user\|\|null,links,own,signIn,tab\}\):\[\]\) as Group\[\]/, 'the panel is an empty shell until then');
+  const brand = readFileSync(new URL('../app/Brand.tsx', import.meta.url), 'utf8');
+  assert.match(brand, /\{product\?<span className="site-header__product">\{product\}<\/span>:null\}/, 'no product, no product line');
+  assert.doesNotMatch(brand, /product=PRODUCT/, 'the header no longer assumes Job Search');
+  // the guards that send a member or a visitor away from an admin view are untouched
+  assert.match(page, /if\(user&&!admin&&\(adminOnly\.includes\(tab\)\|\|tab\.startsWith\('data-'\)\)\)choose\('matches'\)/);
+  assert.match(page, /!admin&&adminOnly\.includes\(tab\)\?<div className="message">Administrator access is required\.<\/div>/);
+});
+
+test('inside the Admin pane, Observability\'s eyebrow says Admin in the admin accent, and its heading names the product it observes', () => {
+  const source = readFileSync(new URL('../app/Observability.tsx', import.meta.url), 'utf8');
+  assert.match(source, /<span className="eyebrow eyebrow--admin">Admin<\/span>/);
+  assert.doesNotMatch(source, /eyebrow--product/);
+  assert.match(source, /<h2>\{tool==='phoenix'\?'Explainability':'Observability'\} · Job Search<\/h2>/);
+  // the admin eyebrow is the tools accent wherever it appears, in the shell and in the pane
+  assert.match(readFileSync(new URL('../app/shell.css', import.meta.url), 'utf8'), /\.eyebrow--admin\{color:var\(--accent-tools\)\}/);
+  assert.match(readFileSync(new URL('../app/visual-theme.css', import.meta.url), 'utf8'), /\.pane \.eyebrow--admin,\.pane \.eyebrow--tools\{color:var\(--accent-tools\)\}/);
+});

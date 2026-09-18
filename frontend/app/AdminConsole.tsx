@@ -147,14 +147,18 @@ function Chart({title,series,labels,unit='',integer=true,empty='No day in this r
  </figure>;
 }
 
-/** A ranked comparison drawn as bars, so the shape is readable without reading every number. The rows cycle the tones. */
+/**
+ * A ranked comparison drawn as bars, so the shape is readable without reading every number. The rows cycle the tones
+ * unless a row names its own: a host-keyed list passes toneFor(host), so a product keeps the colour of its line in
+ * 'Requests per day' in its bars (barRows resolves which; admin-charts.mjs).
+ */
 function Bars({rows,empty='Nothing recorded in this range.',highlight}:
- {rows:{key:string;label:string;value:number;text?:string;muted?:boolean}[];empty?:React.ReactNode;highlight?:string}){
+ {rows:{key:string;label:string;value:number;text?:string;muted?:boolean;tone?:number}[];empty?:React.ReactNode;highlight?:string}){
  if(!rows.length)return <NoChart>{empty}</NoChart>;
- return <ul className="ac-bars">{barRows(rows).map((row,order)=>
+ return <ul className="ac-bars">{barRows(rows).map(row=>
   <li key={row.key} className={highlight&&row.key===highlight?'ac-bar-on':undefined}>
    <span className="ac-bar-label" title={row.label}>{row.label}</span>
-   <span className="ac-bar-track"><span className={'ac-bar-fill ac-tone'+tone(order)+(row.muted?' ac-bar-muted':'')} style={{width:row.width+'%'}}/></span>
+   <span className="ac-bar-track"><span className={'ac-bar-fill ac-tone'+row.tone+(row.muted?' ac-bar-muted':'')} style={{width:row.width+'%'}}/></span>
    <span className="ac-bar-value ac-num">{row.text??num(row.value)}</span></li>)}</ul>;
 }
 
@@ -264,7 +268,7 @@ function TrafficPanel({body,product,products,bots}:{body:Traffic;product:string;
   :[{key:'all',label:'All hosts',values:daySeries(body.daily_visitors||[],days,'human_visitors'),tone:1},
     {key:'products',label:'Product hosts only',values:daySeries(body.daily_visitors||[],days,'product_visitors'),tone:2}],
  [body.daily_by_host,body.daily_visitors,days,one,product,products]);
- const perHost=useMemo(()=>(body.by_host||[]).map(row=>({key:s(row,'host'),label:nameFor(s(row,'host'),products),
+ const perHost=useMemo(()=>(body.by_host||[]).map(row=>({key:s(row,'host'),label:nameFor(s(row,'host'),products),tone:toneFor(s(row,'host'),products),
   value:bots?n(row,'hits'):n(row,'hits')-n(row,'bot_hits'),
   text:num(bots?n(row,'hits'):n(row,'hits')-n(row,'bot_hits'))+(bots?' with bots':'')}))
   .sort((left,right)=>right.value-left.value),[body.by_host,bots,products]);
@@ -381,7 +385,7 @@ function AccountsPanel({body}:{body:Accounts}){
 function MonetizationPanel({body,product,products}:{body:Money;product:string;products:Product[]}){
  const one=product!==ALL;
  const cost=body.ai_cost;
- const reach=useMemo(()=>(body.reach||[]).map(row=>({key:s(row,'host'),label:nameFor(s(row,'host'),products),value:n(row,'visitors')})),[body.reach,products]);
+ const reach=useMemo(()=>(body.reach||[]).map(row=>({key:s(row,'host'),label:nameFor(s(row,'host'),products),tone:toneFor(s(row,'host'),products),value:n(row,'visitors')})),[body.reach,products]);
  const funnel=useMemo(()=>{
   const steps=body.funnel||[];
   if(!one||!steps.length)return steps;

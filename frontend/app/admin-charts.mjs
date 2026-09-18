@@ -123,18 +123,21 @@ export function shapeSeries(series, box = CHART_BOX, options = {}) {
 }
 
 /**
- * Bars as a share of the widest row. A row with nothing in it gets no bar rather than a stub that
- * looks like a small value.
- * @template {{value:number}} T
+ * Bars as a share of the widest row, each with its tone: the row's own when it names one (a host-keyed row keeps
+ * the colour its line has in the day charts, so a product is one colour across the console), the cycling one
+ * otherwise (an unordered list, where no two neighbours may share one). A row with nothing in it gets no bar rather
+ * than a stub that looks like a small value.
+ * @template {{value:number,tone?:number}} T
  * @param {T[]} rows
- * @returns {(T & {width:number})[]}
+ * @returns {(T & {width:number,tone:number})[]}
  */
 export function barRows(rows) {
  const list = rows || [];
  const most = list.reduce((top, row) => Math.max(top, finite(row && row.value)), 0);
- return list.map((row) => {
+ return list.map((row, index) => {
   const value = finite(row && row.value);
-  return {...row, value, width: most <= 0 || value <= 0 ? 0 : Math.max(1.5, round((value / most) * 100))};
+  const own = !!row && Number.isInteger(row.tone) && row.tone >= 1 && row.tone <= TONES;
+  return {...row, value, tone: own ? row.tone : tone(index), width: most <= 0 || value <= 0 ? 0 : Math.max(1.5, round((value / most) * 100))};
  });
 }
 

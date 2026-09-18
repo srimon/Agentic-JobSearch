@@ -180,3 +180,73 @@ test('a funnel keeps a step that is wider than the one above it', () => {
  }
  assert.deepEqual(funnelBars([]), []);
 });
+
+test('a bar keeps the tone its row names, so a host is one colour in the day lines and in its bars; rows without one cycle', () => {
+ const rows = barRows([{value: 3, tone: 4}, {value: 2}, {value: 1, tone: 4}, {value: 5, tone: 0}, {value: 5, tone: TONES + 1}, {value: 5, tone: 2.5}, {value: 5, tone: '3'}]);
+ assert.deepEqual(rows.map((row) => row.tone), [4, 2, 4, 4, 5, 6, 7], 'its own tone when whole and within the ten, the cycling one otherwise');
+ assert.deepEqual(barRows([{value: 1}, {value: 1}, {value: 1}]).map((row) => row.tone), [1, 2, 3]);
+ assert.deepEqual(barRows([{value: 1, tone: 1}, {value: 1, tone: 1}]).map((row) => row.tone), [1, 1], 'two rows may share a named tone: the host decides, not the position');
+ for (const row of barRows(Array.from({length: TONES + 2}, () => ({value: 1})))) assert.ok(row.tone >= 1 && row.tone <= TONES);
+ assert.deepEqual(barRows([]), []);
+ // the console hands the host's tone to its host-keyed lists (Requests per product, Visitors per product) and draws
+ // what barRows resolved; the same toneFor colours the host's line in Requests per day
+ const source = readFileSync(new URL('../app/AdminConsole.tsx', import.meta.url), 'utf8');
+ assert.match(source, /'ac-bar-fill ac-tone'\+row\.tone\+\(row\.muted/, 'Bars draws the resolved tone');
+ assert.doesNotMatch(source, /ac-tone'\+tone\(order\)\+\(row\.muted/, 'never the position alone (the funnel, which no host keys, still cycles)');
+ for (const [list, field] of [['perHost', 'by_host'], ['reach', 'reach']]) {
+  assert.match(source, new RegExp('const ' + list + '=useMemo\\(\\(\\)=>\\(body\\.' + field + "\\|\\|\\[\\]\\)\\.map\\(row=>\\(\\{key:s\\(row,'host'\\),label:nameFor\\(s\\(row,'host'\\),products\\),tone:toneFor\\(s\\(row,'host'\\),products\\)"), list + ' keys its tone by host');
+ }
+ assert.match(source, /values:hostSeries\(rows,days,host,'human_hits'\),tone:toneFor\(host,products\)\}\)\)/, 'the Requests per day lines take the same tone');
+ assert.match(source, /tone\?:number\}\[\];empty\?:React\.ReactNode;highlight\?:string\}/, 'a row may name its tone');
+});
+
+test('the cards sit three across only from 1500px, and a card is a size container that stacks its bar rows below 330px', () => {
+ const css = readFileSync(new URL('../app/admin-console.css', import.meta.url), 'utf8');
+ assert.match(css, /\.ac-cards\{[^}]*grid-template-columns:repeat\(2,minmax\(0,1fr\)\)/, 'two columns by default');
+ assert.match(css, /@media\(min-width:1500px\)\{\.ac-cards\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)\}\}/, 'three from 1500px');
+ assert.match(css, /@media\(max-width:900px\)\{\.ac-cards\{grid-template-columns:minmax\(0,1fr\)\}\}/, 'one to 900px');
+ assert.doesNotMatch(css, /min-width:1200px/, 'the 1200px rule that left each card near 230px beside the panel is gone');
+ assert.match(css, /\.ac-card\{[^}]*container-type:inline-size/, 'the card is a size container');
+ assert.match(css, /\.ac-card-wide\{grid-column:1\/-1\}/, 'a wide card still spans every column');
+ const narrow = /@container \(max-width:330px\)\{([^]*?)\n\}/.exec(css);
+ assert.ok(narrow, 'a container rule for a narrow card');
+ assert.match(narrow[1], /\.ac-bars li,\.ac-funnel-row\{grid-template-columns:minmax\(0,1fr\) auto;row-gap:3px\}/, 'label and value on one row');
+ assert.match(narrow[1], /\.ac-bar-track\{grid-column:1 \/ -1\}/, 'the track on a row of its own');
+ // the same stacked layout the phone breakpoint uses, so the two never disagree
+ const phone = /@media\(max-width:760px\)\{([^]*?)\n\}/.exec(css);
+ assert.ok(phone, 'the phone breakpoint');
+ assert.match(phone[1], /\.ac-bars li,\.ac-funnel-row\{grid-template-columns:minmax\(0,1fr\) auto;row-gap:3px\}/);
+ assert.match(phone[1], /\.ac-bar-track\{grid-column:1 \/ -1\}/);
+ // and the three-column bar row the container rule replaces has no fixed minimum a narrow card cannot honour
+ assert.match(css, /\.ac-bars li,\.ac-funnel-row\{display:grid;grid-template-columns:minmax\(0,9rem\) minmax\(48px,1fr\) auto/);
+});
+
+test('status is the tint and a hairline, never a coloured word: the pills, the warning line and the bad figure set their text in the block ink, 7:1 and better', () => {
+ const css = readFileSync(new URL('../app/admin-console.css', import.meta.url), 'utf8');
+ assert.match(css, /\.ac-pill\{[^}]*;color:var\(--ink-block\)\}/, 'a pill\'s word is in the block ink');
+ assert.match(css, /\.ac-pill-ok\{background:var\(--tint\);border-color:var\(--ok\)\}/);
+ assert.match(css, /\.ac-pill-bad\{background:var\(--error-bg\);border-color:var\(--danger\)\}/);
+ assert.match(css, /\.ac-summary\.ac-warn\{[^}]*;color:var\(--ink-block\)\}/, 'the warning line keeps its tint and its left rule');
+ assert.match(css, /\.ac-figures>div\.ac-bad\{background:var\(--error-bg\);border-color:var\(--danger\)\}/);
+ assert.match(css, /\.ac-figures>div\.ac-bad strong\{color:var\(--ink-block\)\}/);
+ // no declaration anywhere sets words in a semantic colour
+ assert.doesNotMatch(css, /[{;]color:var\(--(?:ok|warn|danger|warn-ink|error-ink)\)/);
+ // and the header's 7:1 claim holds by measurement: the block ink on every tint used here, from the brand tokens
+ const tokens = {};
+ for (const file of ['globals.css', 'shell.css']) {
+  for (const [, name, hex] of readFileSync(new URL('../app/' + file, import.meta.url), 'utf8').matchAll(/--([a-z0-9-]+):\s*(#[0-9A-Fa-f]{6})\b/g)) tokens[name] ??= hex;
+ }
+ const luminance = (hex) => [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255)
+  .map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+  .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+ const contrast = (ink, ground) => {
+  assert.ok(tokens[ink] && tokens[ground], ink + ' and ' + ground + ' are brand tokens');
+  const [hi, lo] = [luminance(tokens[ink]), luminance(tokens[ground])].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+ };
+ for (const tint of ['surface-2', 'error-bg', 'warn-bg']) assert.ok(contrast('ink-block', tint) >= 7, 'ink-block on ' + tint + ': ' + contrast('ink-block', tint).toFixed(2));
+ // why the words are not in the status colours: none of them reaches 7:1 on its tint (--tint is --surface-2)
+ for (const [ink, tint] of [['ok', 'surface-2'], ['danger', 'error-bg'], ['warn', 'warn-bg'], ['danger', 'surface-2']]) {
+  assert.ok(contrast(ink, tint) < 7, ink + ' on ' + tint + ' is under 7:1, so it is a hairline and a tint, not a word');
+ }
+});

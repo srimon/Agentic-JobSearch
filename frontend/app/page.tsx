@@ -54,6 +54,12 @@ export default function Home(){
  const [session,setSession]=useState<Session|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(false);
 
  const [tab,setTab]=useState('matches'),[q,setQ]=useState(''),[query,setQuery]=useState(''),[date,setDate]=useState('24h'),[level,setLevel]=useState(''),[mode,setMode]=useState(''),[page,setPage]=useState(1);
+ // Whether the address's ?view= has been read (the mount effect below sets it last). Until then the page names no
+ // product, no group and no screen: the header has no product line, the panel is an empty shell and the pane has no
+ // heading, so the prerendered HTML and the first client render are the same for every address and
+ // https://bagala.ai/jobsearch/?view=admin never paints the Job Search scene before hydration. It starts false on the
+ // server and the client alike (never `typeof window`), so nothing mismatches.
+ const [viewReady,setViewReady]=useState(false);
  const [usState,setUsState]=useState(''),[titleFamily,setTitleFamily]=useState(''),[facets,setFacets]=useState<Facets>({states:[],titles:[]});
  const listSeq=useRef(0);
  const [toast,setToast]=useState<{text:string;undo?:Job}|null>(null);
@@ -99,8 +105,9 @@ export default function Home(){
  async function signOut(){if(signingOut)return;setSigningOut(true);try{await signOutToSignIn()}catch(e){setError(describeError(e));setSigningOut(false)}}
 
  // ?view= names the screen to open: every view choose() can write (the workspace, the account, every admin and data
- // view), so a reload, Back or a link from another product's panel lands on the same screen.
- useEffect(()=>{const params=new URLSearchParams(window.location.search);const views=['matches','emailed','archive','saved','intake','applications','review','sources','quality','governance','account',...ADMIN_VIEWS,...dataGroups.flatMap(g=>g.tools.map(t=>'data-'+t.id))];if(views.includes(params.get('view')||'')){setTab(params.get('view')!);setDate(params.get('view')==='archive'?'any':'24h');setShowDismissed(params.get('view')==='emailed')}},[]);
+ // view), so a reload, Back or a link from another product's panel lands on the same screen. The view is declared
+ // ready in the same effect, after the tab is set, so both land in one render: the first screen is the right one.
+ useEffect(()=>{const params=new URLSearchParams(window.location.search);const views=['matches','emailed','archive','saved','intake','applications','review','sources','quality','governance','account',...ADMIN_VIEWS,...dataGroups.flatMap(g=>g.tools.map(t=>'data-'+t.id))];if(views.includes(params.get('view')||'')){setTab(params.get('view')!);setDate(params.get('view')==='archive'?'any':'24h');setShowDismissed(params.get('view')==='emailed')}setViewReady(true)},[]);
  useEffect(()=>{if(!user)return;const id=new URLSearchParams(window.location.search).get('job');if(id&&/^[0-9a-f-]{36}$/i.test(id))api<Job>('/jobs/'+id).then(j=>{if(j.archived_at)setNotice('This job is archived and locked.');else setDetail(j)}).catch(e=>setError(e.message));},[user]);
 
  useEffect(()=>{if(!user)return;const id=new URLSearchParams(window.location.search).get('archived');if(id&&/^[0-9a-f-]{36}$/i.test(id))api<Job>('/jobs/'+id).then(j=>{if(j.archived_at)setNotice('Status saved. The job is archived and permanently locked.')}).catch(e=>setError(e.message));},[user]);
@@ -195,17 +202,17 @@ export default function Home(){
  // admin view the group is Admin: the header says so, and the panel wears the standard groups without a product group.
  const group=viewGroup(tab),groupLabel=(GROUP_LABELS as Record<string,string>)[group]||PRODUCT;
 
- return <HubLinksContext.Provider value={{links,operator:admin}}><div className="brand-page"><a className="skip" href="#main">Skip to content</a><BrandHeader product={groupLabel==='Account'?PRODUCT:groupLabel}/><div className="shell"><MotionScene loading={loading} saving={!!busyJob} label={labels[tab]}/>
- <SidePanel user={user} links={links} tab={tab} own={appPath('/')} signIn={signIn||appPath('/')} ready={!!session} signingOut={signingOut} choose={choose} onSignOut={signOut} onEnquiry={()=>setEnquiry(true)}/>
+ return <HubLinksContext.Provider value={{links,operator:admin}}><div className="brand-page"><a className="skip" href="#main">Skip to content</a><BrandHeader product={viewReady?(groupLabel==='Account'?PRODUCT:groupLabel):null}/><div className="shell"><MotionScene loading={loading} saving={!!busyJob} label={labels[tab]}/>
+ <SidePanel user={user} links={links} tab={tab} viewReady={viewReady} own={appPath('/')} signIn={signIn||appPath('/')} ready={!!session} signingOut={signingOut} choose={choose} onSignOut={signOut} onEnquiry={()=>setEnquiry(true)}/>
 
  <main id="main" className="pane" data-group={group}>
  {session?.features?.maintenance&&<p className="notice" role="status">Scheduled maintenance · Changes to jobs, profiles and applications are temporarily disabled.</p>}
 
- <section className="content"><div key={tab} className="page-heading page-arrival"><div><div className={'eyebrow eyebrow--'+group}>{groupLabel}</div><h1>{labels[tab]}</h1><p>{tab==='emailed'?'Work through the jobs in your email reports. Selecting a status saves it immediately, permanently locks the job and moves it to Archive.':tab==='archive'?'Completed decisions are locked. Archived jobs are excluded from future reports.':tab==='sources'?'See where your opportunities come from.':tab==='runs'?'Track source checks and collection outcomes.':tab==='model'?'Explore the PostgreSQL table structure and declared relationships.':tab==='quality'?'Evidence-based checks for this application.':tab==='observability'?'Live metrics and traces, together in your workspace.':tab==='admin'?'Traffic, accounts, conversion and machine load across every Bagala product.':tab==='account'?'Your Bagala account: name, email, password, API keys and signed-in devices.':'Find the role where your experience makes a difference.'}</p></div><button className="secondary" disabled={!user||loading} onClick={()=>setVersion(v=>v+1)}><RefreshCw size={16} className={loading?'spin':''}/>Refresh</button></div>
+ <section className="content"><div key={viewReady?tab:''} className="page-heading page-arrival">{viewReady?<div><div className={'eyebrow eyebrow--'+group}>{groupLabel}</div><h1>{labels[tab]}</h1><p>{tab==='emailed'?'Work through the jobs in your email reports. Selecting a status saves it immediately, permanently locks the job and moves it to Archive.':tab==='archive'?'Completed decisions are locked. Archived jobs are excluded from future reports.':tab==='sources'?'See where your opportunities come from.':tab==='runs'?'Track source checks and collection outcomes.':tab==='model'?'Explore the PostgreSQL table structure and declared relationships.':tab==='quality'?'Evidence-based checks for this application.':tab==='observability'?'Live metrics and traces, together in your workspace.':tab==='admin'?'Traffic, accounts, conversion and machine load across every Bagala product.':tab==='account'?'Your Bagala account: name, email, password, API keys and signed-in devices.':'Find the role where your experience makes a difference.'}</p></div>:<div/>}<button className="secondary" disabled={!user||loading} onClick={()=>setVersion(v=>v+1)}><RefreshCw size={16} className={loading?'spin':''}/>Refresh</button></div>
 
  {error&&<div className="message error" role="alert">{error}<button onClick={()=>location.reload()}>Reload</button></div>}
 
- {['matches','emailed'].includes(tab)&&<SearchOverview view={tab}/>}
+ {viewReady&&['matches','emailed'].includes(tab)&&<SearchOverview view={tab}/>}
  {user&&admin&&['matches','emailed','saved'].includes(tab)&&<Learning onChange={()=>setVersion(v=>v+1)}/>}
  {user&&admin&&!tab.startsWith('data-')&&!['workflow','observability','admin','quality','model','governance','account'].includes(tab)&&<CollectionStatus version={version} date={date}/>}
  {notice&&<div className="message" role="status">{notice}</div>}

@@ -1,11 +1,16 @@
 /* Administrator console, charts first. Gold tokens only (platform/brand/BRAND.md via globals.css and shell.css):
-   every colour below is one of the brand variables, none is a new value. Three columns of cards from 1200px, two
-   between 900 and 1200px, one below, and nothing scrolls sideways at 400px. Compressed and coloured 18 Sep 2026 at
-   the owner's request: each of the four panels wears one of the shell's group accents (its titles, its figures, its
-   summary line, its single-series charts), the series tones are the group accents and the dark inks - each at least
-   7:1 on the gold grounds, so a legend can be set in its series' colour - and every secondary line of type is 13px
-   at weight 600, values in the body ink, captions and axis labels in the deep brown. Series are told apart by
-   colour, by dash pattern and by the legend and readout, so colour is never the only channel. */
+   every colour below is one of the brand variables, none is a new value. Three columns of cards from 1500px, two
+   between 900 and 1500px, one below (the pane is the viewport less the 288px panel, so three across any narrower
+   left each card near 230px and its bar rows overflowing); each card is a size container that stacks its bar and
+   funnel rows below 330px whatever the breakpoint; and nothing scrolls sideways at 400px. Compressed and coloured
+   18 Sep 2026 at the owner's request: each of the four panels wears one of the shell's group accents (its titles,
+   its figures, its summary line, its single-series charts), the series tones are the group accents and the dark
+   inks - each at least 7:1 on the gold grounds, so a legend can be set in its series' colour - and every secondary
+   line of type is 13px at weight 600, values in the body ink, captions and axis labels in the deep brown. Series
+   are told apart by colour, by dash pattern and by the legend and readout, so colour is never the only channel.
+   Every word here is in an ink or an accent: the semantic colours (--ok, --warn, --danger) sit between 4.8:1 and
+   6.7:1 on their tints, so a status pill, the warning line and the bad figure set their words in the block ink and
+   carry the status as the tint and a hairline in the status colour. */
 .admin-console{display:grid;gap:14px;min-width:0}
 .ac-num{font-variant-numeric:tabular-nums}
 
@@ -53,16 +58,20 @@
 .admin-console .ac-panel h2{font:750 20px/1.3 var(--font);color:var(--panel-accent,var(--ink-block));margin:0}
 .ac-source{margin:4px 0 0;font-size:13px;font-weight:600;color:var(--ink-muted);overflow-wrap:anywhere}
 .ac-summary{margin:14px 0 0;padding:10px 14px;background:var(--surface-2);border:1px solid var(--line);border-left:4px solid var(--panel-accent,var(--line-strong));border-radius:8px;color:var(--panel-accent,var(--ink));font-weight:600;line-height:1.55}
-.ac-summary.ac-warn{background:var(--warn-bg);border-color:var(--line);border-left-color:var(--warn);color:var(--warn-ink)}
+.ac-summary.ac-warn{background:var(--warn-bg);border-color:var(--line);border-left-color:var(--warn);color:var(--ink-block)}
 .ac-note{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--ink-muted);line-height:1.55}
 
-/* Cards: three columns from 1200px, two between 900 and 1200px, one below. Each card leads with its chart. */
+/* Cards: three columns from 1500px, two between 900 and 1500px, one below. The breakpoints are the viewport's, and
+   the pane is the viewport less the 288px panel, so three across from 1200px left each card near 230px between
+   1200 and 1300px, where a bar row's three columns (label, track, value) could not fit and lost their labels. Each
+   card leads with its chart, and each is a size container (the @container rule under the bars below), so a card
+   narrower than 330px stacks its rows whatever the breakpoint. A wide card spans every column. */
 .ac-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
-.ac-card{min-width:0;border:1px solid var(--line);border-radius:11px;padding:12px 14px;background:var(--surface)}
+.ac-card{min-width:0;border:1px solid var(--line);border-radius:11px;padding:12px 14px;background:var(--surface);container-type:inline-size}
 .ac-card-wide{grid-column:1/-1}
 .admin-console .ac-card h3{font:750 14px/1.4 var(--font);color:var(--panel-accent,var(--ink-block));margin:0 0 8px;overflow-wrap:anywhere}
 .ac-caption{margin:8px 0 0;font-size:13px;font-weight:600;color:var(--ink-muted);line-height:1.5}
-@media(min-width:1200px){.ac-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(min-width:1500px){.ac-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:900px){.ac-cards{grid-template-columns:minmax(0,1fr)}}
 
 /* Charts: drawn at the card's measured width and a fixed 140px height, so the type is never scaled. */
@@ -129,6 +138,12 @@
 .ac-funnel li{display:grid;gap:3px}
 .ac-funnel-gap{font-size:13px;font-weight:600;color:var(--ink-muted);padding-left:2px}
 .ac-mark{font-style:normal;font-size:13px;font-weight:600;color:var(--ink-muted);margin-left:6px}
+/* A narrow card (.ac-card is the container), whatever the viewport: the label and the value sit above the track on
+   a row of their own, so the three columns never squeeze the label into nothing or push the value out of the card. */
+@container (max-width:330px){
+ .ac-bars li,.ac-funnel-row{grid-template-columns:minmax(0,1fr) auto;row-gap:3px}
+ .ac-bar-track{grid-column:1 / -1}
+}
 
 .ac-substack{margin:0 0 4px;font-size:13px;font-weight:600;color:var(--ink-muted)}
 .ac-stackwrap+.ac-substack{margin-top:12px}
@@ -149,7 +164,8 @@
 .ac-figures strong{display:block;font:800 20px/1.2 var(--font);color:var(--panel-accent,var(--ink-block));overflow-wrap:anywhere}
 .ac-figures span{display:block;margin-top:4px;font-size:13px;font-weight:600;color:var(--ink-muted);line-height:1.4}
 .ac-figures-plain>div{background:transparent}
-.ac-figures>div.ac-bad strong{color:var(--danger)}
+.ac-figures>div.ac-bad{background:var(--error-bg);border-color:var(--danger)}
+.ac-figures>div.ac-bad strong{color:var(--ink-block)}
 .ac-figures>div.ac-figure-aside{background:transparent;border-style:dashed}
 .ac-figures>div.ac-figure-aside strong{color:var(--ink-muted)}
 
@@ -159,9 +175,11 @@
 .ac-table th{text-transform:uppercase;letter-spacing:1px;color:var(--ink-block);font-weight:800;font-size:13px;white-space:nowrap}
 .ac-table tr:last-child td{border-bottom:0}
 .ac-table code{overflow-wrap:anywhere;font-size:13px}
-.ac-pill{display:inline-block;padding:2px 9px;border-radius:12px;font-size:13px;font-weight:700;background:var(--surface-2)}
-.ac-pill-ok{background:var(--tint);color:var(--ok)}
-.ac-pill-bad{background:var(--error-bg);color:var(--danger)}
+/* Status pills: the word in the block ink (17:1 on the tint, 16:1 on the error tint), the status as the tint and a
+   hairline in the status colour; --ok and --danger as text sat at 5.7:1 and 6.2:1 on these tints. */
+.ac-pill{display:inline-block;padding:2px 9px;border-radius:12px;font-size:13px;font-weight:700;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-block)}
+.ac-pill-ok{background:var(--tint);border-color:var(--ok)}
+.ac-pill-bad{background:var(--error-bg);border-color:var(--danger)}
 
 .ac-measured{margin-top:14px;border-top:1px solid var(--line);padding-top:10px;font-size:13px}
 .ac-measured summary{cursor:pointer;font-weight:700;color:var(--panel-accent,var(--accent-tools))}

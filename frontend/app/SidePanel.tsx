@@ -18,9 +18,13 @@ type Group={id:string;label:string;accent:string;name?:string|null;entries:Entry
  *
  * The Admin group's Data management row is a fold (a <details> of its own): closed until its row is pressed, open
  * by itself on one of its views, and closed again when any other entry is chosen or the view changes to another.
+ *
+ * Until the page has read the address's ?view= (`viewReady`, page.tsx) the panel is its shell alone - the Menu
+ * toggle and an empty nav - so the prerendered HTML and the first client render never show one context's groups on
+ * an address that names the other.
  */
-export default function SidePanel({user,links,tab,own,signIn,ready,signingOut,choose,onSignOut,onEnquiry}:
- {user:User|null|undefined;links:Links;tab:string;own:string;signIn:string;ready:boolean;signingOut:boolean;choose:(view:string)=>void;onSignOut:()=>void;onEnquiry:()=>void}){
+export default function SidePanel({user,links,tab,viewReady,own,signIn,ready,signingOut,choose,onSignOut,onEnquiry}:
+ {user:User|null|undefined;links:Links;tab:string;viewReady:boolean;own:string;signIn:string;ready:boolean;signingOut:boolean;choose:(view:string)=>void;onSignOut:()=>void;onEnquiry:()=>void}){
  const [open,setOpen]=useState(true);
  useEffect(()=>{
   const narrow=window.matchMedia(NARROW);
@@ -32,7 +36,7 @@ export default function SidePanel({user,links,tab,own,signIn,ready,signingOut,ch
  // The fold follows the view: open on a data view, closed on any other; pressing its row toggles it in between.
  const [foldOpen,setFoldOpen]=useState(false);
  useEffect(()=>{setFoldOpen(isDataView(tab))},[tab]);
- const groups=panelGroups({user:user||null,links,own,signIn,tab}) as Group[];
+ const groups=(viewReady?panelGroups({user:user||null,links,own,signIn,tab}):[]) as Group[];
  const settle=()=>{if(window.matchMedia(NARROW).matches)setOpen(false)};
  const pick=(view:string)=>{choose(view);setFoldOpen(isDataView(view));settle()};
  const leave=()=>{setFoldOpen(false);settle()};
