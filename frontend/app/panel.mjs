@@ -4,11 +4,16 @@
  * can check what each role is offered without a browser. SidePanel.tsx renders what this returns.
  *
  * Two contexts (18 Sep 2026). On the workspace views the groups are: the product's own group (Job Search: the
- * workspace entries by role), Products (Relax > Ask about a Book; Job > Job Search, Interview Preparation),
- * Documentation, Admin (administrators only) and Account. On an admin view (ADMIN_VIEWS: the console, observability,
- * the daily workflow, activity and every data view) the page wears the hub's standard groups without a product group
- * and Job Search is no longer marked current: the same panel the public site and the Library reader show, so choosing
- * Admin console from another product no longer lands in Job Search's product navigation.
+ * workspace entries by role), Products (Choose a product, then Job > Job Search, Interview Preparation, then
+ * Relax > Ask about a Book), User creation, Documentation, Admin (administrators only) and Account. On an admin view
+ * (ADMIN_VIEWS: the console, observability, the daily workflow, activity and every data view) the page wears the
+ * hub's standard groups without a product group and Job Search is no longer marked current: the same panel the public
+ * site and the Library reader show, so choosing Admin console from another product no longer lands in Job Search's
+ * product navigation.
+ *
+ * The owner's order (18 Sep 2026): Products leads with 'Choose a product' and Job comes before Relax; the new group
+ * 'User creation' follows Products, holding the account step and the Create Account guide moved out of Documentation;
+ * the steps 'Use it with your own data' and 'Keep improving' are gone.
  *
  * The Admin group is platform/brand/panel.json's, entry for entry and in its order (app/panel.json is the
  * byte-identical copy; tests/panel.test.mjs compares both): the entries on this product's public address become
@@ -27,7 +32,7 @@ export const PUBLIC = {jobs: 'https://bagala.ai/jobsearch/', library: 'https://b
 /** The calm motions the site gives its icons (bagala.css .option__icon--* rules). */
 export const MOTIONS = ['pulse', 'sway', 'spin', 'nudge', 'bounce', 'orbit', 'wiggle'];
 /** The accents a group may carry (shell.css .side__group--* rules). */
-export const ACCENTS = ['product', 'start', 'relax', 'jobs', 'docs', 'tools', 'account', 'data'];
+export const ACCENTS = ['product', 'start', 'signup', 'relax', 'jobs', 'docs', 'tools', 'account', 'data'];
 
 const entry = (id, label, icon, motion, extra = {}) => ({id, label, icon, motion, ...extra});
 const trailing = (url) => (url.endsWith('/') ? url : url + '/');
@@ -40,19 +45,26 @@ const trailing = (url) => (url.endsWith('/') ? url : url + '/');
 export const STANDARD = {
   products: {
     id: 'products', label: 'Products', accent: 'start',
+    /** The sub-groups the hub nests under 'Choose a product': Job before Relax (the owner, 18 Sep 2026). */
     sub: [
-      {id: 'relax', label: 'Relax', entries: [{label: 'Ask about a Book', href: PUBLIC.library, icon: 'book', motion: 'sway'}]},
       {id: 'jobs', label: 'Job', entries: [
         {label: 'Job Search', href: PUBLIC.jobs, icon: 'search', motion: 'orbit'},
         {label: 'Interview Preparation', href: PUBLIC.prep, icon: 'chat', motion: 'pulse'},
       ]},
+      {id: 'relax', label: 'Relax', entries: [{label: 'Ask about a Book', href: PUBLIC.library, icon: 'book', motion: 'sway'}]},
+    ],
+  },
+  signup: {
+    id: 'signup', label: 'User creation', accent: 'signup',
+    entries: [
+      {label: 'Create your account', href: SITE + '/#create-your-account', icon: 'signin', motion: 'wiggle'},
+      {label: 'Create Account', href: SITE + '/docs/create-account', icon: 'document', motion: 'sway'},
     ],
   },
   docs: {
     id: 'docs', label: 'Documentation', accent: 'docs',
     entries: [
       {label: 'Overview', href: SITE + '/docs', icon: 'document', motion: 'sway'},
-      {label: 'Create Account', href: SITE + '/docs/create-account', icon: 'signin', motion: 'wiggle'},
       {label: 'Ask the Book', href: SITE + '/docs/read-books', icon: 'book', motion: 'sway'},
       {label: 'Job Search', href: SITE + '/docs/job-search', icon: 'search', motion: 'orbit'},
       {label: 'Training', href: SITE + '/docs/interview-preparation', icon: 'chat', motion: 'pulse'},
@@ -87,6 +99,8 @@ export const STANDARD = {
         ]},
       ]},
       {label: 'Slack', href: 'https://app.slack.com/client/T0BG19JLPF1/C0BGLC0055J', icon: 'chat', motion: 'pulse'},
+      // The administrator's in-place editing of this screen's static copy (the shared text store, /api/hub/page-text).
+      {label: 'Edit the text on this page', action: 'page-text', icon: 'pencil', motion: 'nudge'},
     ],
   },
   account: {
@@ -144,6 +158,8 @@ const slug = (label) => label.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(
 export function localizeEntry(item, links = {}) {
   const view = viewOf(item.href);
   if (view) return entry(view, item.label, item.icon, item.motion, {view});
+  // A control the page provides rather than an address: 'page-text' turns on the administrator's in-place editing.
+  if (item.action) return entry(item.action, item.label, item.icon, item.motion, {action: item.action});
   if (item.sub) {
     const group = item.sub[0];
     return entry(group.id, item.label, item.icon, item.motion, {fold: true, accent: group.accent || 'data', entries: group.entries.map((child) => localizeEntry(child, links))});
@@ -175,16 +191,23 @@ export function panelGroups({user = null, links = {}, own = '/', signIn = '/', t
 
   if (!adminContext) groups.push({id: 'product', label: PRODUCT, accent: 'product', entries: workspaceEntries({member, admin}), subgroups: []});
 
+  // Products: 'Choose a product' first, then Job, then Relax (the owner's order, 18 Sep 2026).
   groups.push({
     id: 'products', label: 'Products', accent: 'start',
-    entries: [entry('hub', 'Products', 'grid', 'orbit', {href: links.hub || SITE + '/#products', external: !!links.hub})],
+    entries: [entry('hub', 'Choose a product', 'grid', 'orbit', {href: links.hub || SITE + '/#choose-a-product', external: !!links.hub})],
     subgroups: [
-      {id: 'relax', label: 'Relax', accent: 'relax', entries: [entry('library', 'Ask about a Book', 'book', 'sway', {href: links.library || SITE + '/docs/read-books', external: !!links.library})]},
       {id: 'jobs', label: 'Job', accent: 'jobs', entries: [
         entry('jobsearch', 'Job Search', 'search', 'orbit', {href: own, current: !adminContext}),
         entry('prep', 'Interview Preparation', 'chat', 'pulse', {href: links.prep || SITE + '/docs/interview-preparation', external: !!links.prep}),
       ]},
+      {id: 'relax', label: 'Relax', accent: 'relax', entries: [entry('library', 'Ask about a Book', 'book', 'sway', {href: links.library || SITE + '/docs/read-books', external: !!links.library})]},
     ],
+  });
+
+  // User creation, immediately after Products: the account step and the Create Account guide moved out of Documentation.
+  groups.push({
+    id: 'signup', label: STANDARD.signup.label, accent: STANDARD.signup.accent, subgroups: [],
+    entries: STANDARD.signup.entries.map((item) => entry('signup-' + slug(item.label), item.label, item.icon, item.motion, {href: item.href})),
   });
 
   groups.push({

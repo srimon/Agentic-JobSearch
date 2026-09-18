@@ -10,9 +10,12 @@ const THANKS='Thank you. Your message has been sent.';
  * The standard header (BRAND.md, the public site): the "B" mark, the wordmark, the site title with the product's name
  * under it ('Admin' on an admin view; no product line at all until the page knows which view the address names, so
  * the first paint never says 'Job Search' on an admin address). Nothing else: every selection lives in the left panel.
+ *
+ * `group` is the panel group the screen belongs to (panel.mjs viewGroup): the product line takes that group's darker
+ * label shade through --group-label, so it reads as a heading rather than as another entry.
  */
-export function BrandHeader({product}:{product?:string|null}){
- return <header className="site-header">
+export function BrandHeader({product,group}:{product?:string|null;group?:string|null}){
+ return <header className="site-header" data-group={group||undefined}>
   <div className="wrap site-header__inner">
    <a className="brand" href={SITE+'/'}><span className="brand__mark" aria-hidden="true">B</span><span>Bagala</span></a>
    <span className="site-header__title">{SITE_TITLE}{product?<span className="site-header__product">{product}</span>:null}</span>
@@ -30,11 +33,11 @@ export function BrandFooter({onEnquiry}:{onEnquiry:()=>void}){
  return <footer className="site-footer">
   <div className="wrap">
    <div className="footer-enquiries">
-    <div><h2>Enquiries</h2><p>Questions about our products, your account or access for your organisation? Send us a message.</p></div>
-    <button className="btn btn-primary" type="button" onClick={onEnquiry}>Email Admin</button>
+    <div><h2 data-text="footer.enquiries.heading">Enquiries</h2><p data-text="footer.enquiries.lede">Questions about our products, your account or access for your organisation? Send us a message.</p></div>
+    <button className="btn btn-primary" type="button" onClick={onEnquiry} data-text="footer.enquiries.button">Email Admin</button>
    </div>
-   <div className="footer-cols">{columns.map(([id,title,items])=><nav key={id} aria-labelledby={'footer-'+id}><h2 id={'footer-'+id}>{title}</h2><ul>{items.map(([label,href])=><li key={label}><a href={href} rel={href.startsWith(SITE)?undefined:'noopener'}>{label}</a></li>)}</ul></nav>)}</div>
-   <p className="footer-copy">© 2026 Bagala.ai. All rights reserved.</p>
+   <div className="footer-cols">{columns.map(([id,title,items])=><nav key={id} aria-labelledby={'footer-'+id}><h2 id={'footer-'+id} data-text={'footer.'+id+'-heading'}>{title}</h2><ul>{items.map(([label,href])=><li key={label}><a href={href} rel={href.startsWith(SITE)?undefined:'noopener'}>{label}</a></li>)}</ul></nav>)}</div>
+   <p className="footer-copy" data-text="footer.copyright">© 2026 Bagala.ai. All rights reserved.</p>
   </div>
  </footer>;
 }

@@ -38,11 +38,11 @@ test('the shell names the site the way the public site does, and never says Ente
   }
 });
 
-test('on a workspace view the groups come in the standard order: the product first, then Products, Documentation, Admin for administrators, Account last', () => {
+test('on a workspace view the groups come in the standard order: the product first, then Products, User creation, Documentation, Admin for administrators, Account last', () => {
   for (const tab of ['matches', 'saved', 'emailed', 'archive', 'intake', 'applications', 'review', 'sources', 'account', undefined]) {
-    assert.deepEqual(visitor(tab).map((g) => g.id), ['product', 'products', 'docs', 'account'], String(tab));
-    assert.deepEqual(member(tab).map((g) => g.id), ['product', 'products', 'docs', 'account'], String(tab));
-    assert.deepEqual(admin(tab).map((g) => g.id), ['product', 'products', 'docs', 'admin', 'account'], String(tab));
+    assert.deepEqual(visitor(tab).map((g) => g.id), ['product', 'products', 'signup', 'docs', 'account'], String(tab));
+    assert.deepEqual(member(tab).map((g) => g.id), ['product', 'products', 'signup', 'docs', 'account'], String(tab));
+    assert.deepEqual(admin(tab).map((g) => g.id), ['product', 'products', 'signup', 'docs', 'admin', 'account'], String(tab));
   }
   for (const groups of [visitor(), member(), admin()]) {
     assert.equal(groups[0].label, 'Job Search');
@@ -55,17 +55,17 @@ test('the admin context: on an admin view there is no product group, and Job Sea
     'data-catalog', 'data-governance', 'data-lineage', 'data-science', 'data-ingestion', 'data-dbt', 'data-slack']);
   for (const tab of ADMIN_VIEWS) {
     assert.ok(isAdminView(tab), tab);
-    assert.deepEqual(admin(tab).map((g) => g.id), ['products', 'docs', 'admin', 'account'], tab);
-    assert.equal(byId(admin(tab), 'products').subgroups[1].entries[0].current, false, tab);
-    assert.equal(byId(admin(tab), 'products').subgroups[1].entries[0].href, '/jobsearch/', tab);
+    assert.deepEqual(admin(tab).map((g) => g.id), ['products', 'signup', 'docs', 'admin', 'account'], tab);
+    assert.equal(byId(admin(tab), 'products').subgroups[0].entries[0].current, false, tab);
+    assert.equal(byId(admin(tab), 'products').subgroups[0].entries[0].href, '/jobsearch/', tab);
     // a member or a visitor who lands on an admin address gets the standard groups too (page.tsx sends a member back to Opportunities)
-    assert.deepEqual(member(tab).map((g) => g.id), ['products', 'docs', 'account'], tab);
-    assert.deepEqual(visitor(tab).map((g) => g.id), ['products', 'docs', 'account'], tab);
+    assert.deepEqual(member(tab).map((g) => g.id), ['products', 'signup', 'docs', 'account'], tab);
+    assert.deepEqual(visitor(tab).map((g) => g.id), ['products', 'signup', 'docs', 'account'], tab);
   }
   assert.ok(isAdminView('data-anything'), 'every data view is an admin view');
   for (const tab of ['matches', 'saved', 'emailed', 'archive', 'intake', 'applications', 'review', 'sources', 'account', 'quality', 'governance']) {
     assert.equal(isAdminView(tab), false, tab);
-    assert.equal(byId(admin(tab), 'products').subgroups[1].entries[0].current, true, tab);
+    assert.equal(byId(admin(tab), 'products').subgroups[0].entries[0].current, true, tab);
   }
   assert.equal(isAdminView(undefined), false);
 });
@@ -84,28 +84,44 @@ test('the product group holds the workspace entries by role: four for a visitor,
   for (const groups of [visitor(), member(), admin()]) assert.deepEqual(byId(groups, 'product').subgroups, [], 'no sub-group under the product any more');
 });
 
-test('Products offers the site\'s groups: Relax > Ask about a Book and Job > Job Search (this product) and Interview Preparation', () => {
+test('Products leads with Choose a product, then Job > Job Search (this product) and Interview Preparation, then Relax > Ask about a Book', () => {
   for (const groups of [visitor(), member(), admin()]) {
     const products = byId(groups, 'products');
     assert.equal(products.accent, 'start');
-    assert.deepEqual(products.entries.map((e) => [e.label, e.href]), [['Products', links.hub]]);
-    assert.deepEqual(products.subgroups.map((s) => [s.label, s.accent]), [['Relax', 'relax'], ['Job', 'jobs']]);
-    assert.deepEqual(products.subgroups[0].entries.map((e) => [e.label, e.href]), [['Ask about a Book', links.library]]);
-    assert.deepEqual(products.subgroups[1].entries.map((e) => [e.label, e.href, !!e.current]),
+    assert.deepEqual(products.entries.map((e) => [e.label, e.href]), [['Choose a product', links.hub]]);
+    // the owner's order of 18 Sep 2026: Job before Relax
+    assert.deepEqual(products.subgroups.map((s) => [s.label, s.accent]), [['Job', 'jobs'], ['Relax', 'relax']]);
+    assert.deepEqual(products.subgroups[0].entries.map((e) => [e.label, e.href, !!e.current]),
       [['Job Search', '/jobsearch/', true], ['Interview Preparation', links.prep, false]]);
+    assert.deepEqual(products.subgroups[1].entries.map((e) => [e.label, e.href]), [['Ask about a Book', links.library]]);
   }
   // without the session's links the entries go to the site's own pages for the products
   const bare = byId(panelGroups({user: null, links: {}}), 'products');
-  assert.equal(bare.entries[0].href, SITE + '/#products');
-  assert.equal(bare.subgroups[0].entries[0].href, SITE + '/docs/read-books');
-  assert.equal(bare.subgroups[1].entries[1].href, SITE + '/docs/interview-preparation');
+  assert.equal(bare.entries[0].href, SITE + '/#choose-a-product');
+  assert.equal(bare.subgroups[0].entries[1].href, SITE + '/docs/interview-preparation');
+  assert.equal(bare.subgroups[1].entries[0].href, SITE + '/docs/read-books');
 });
 
-test('Documentation lists the site\'s seven guides in its order, on the public site', () => {
+test('User creation comes straight after Products, for everyone: the account step and the guide moved out of Documentation', () => {
+  for (const groups of [visitor(), member(), admin(), admin('admin')]) {
+    const ids = groups.map((g) => g.id);
+    assert.equal(ids[ids.indexOf('products') + 1], 'signup');
+    const signup = byId(groups, 'signup');
+    assert.equal(signup.label, 'User creation');
+    assert.equal(signup.accent, 'signup');
+    assert.deepEqual(signup.entries.map((e) => [e.id, e.label, e.href]), [
+      ['signup-create-your-account', 'Create your account', SITE + '/#create-your-account'],
+      ['signup-create-account', 'Create Account', SITE + '/docs/create-account'],
+    ]);
+    assert.deepEqual(signup.subgroups, []);
+  }
+});
+
+test('Documentation lists the site\'s six guides in its order, on the public site; Create Account has left it', () => {
   const docs = byId(visitor(), 'docs');
   assert.equal(docs.accent, 'docs');
-  assert.deepEqual(labels(docs), ['Overview', 'Create Account', 'Ask the Book', 'Job Search', 'Training', 'Help and troubleshooting', 'Resources']);
-  assert.deepEqual(docs.entries.map((e) => e.href), [SITE + '/docs', SITE + '/docs/create-account', SITE + '/docs/read-books', SITE + '/docs/job-search',
+  assert.deepEqual(labels(docs), ['Overview', 'Ask the Book', 'Job Search', 'Training', 'Help and troubleshooting', 'Resources']);
+  assert.deepEqual(docs.entries.map((e) => e.href), [SITE + '/docs', SITE + '/docs/read-books', SITE + '/docs/job-search',
     SITE + '/docs/interview-preparation', SITE + '/help', SITE + '/#resources']);
 });
 
@@ -118,16 +134,19 @@ test('Admin is for administrators only, in both contexts, and is the hub\'s Admi
     assert.equal(group.label, 'Admin');
     assert.equal(group.accent, 'tools');
     assert.deepEqual(labels(group), STANDARD.admin.entries.map((e) => e.label), tab);
-    assert.deepEqual(group.entries.map((e) => e.view || e.href || (e.fold ? 'fold' : e.action)), [
+    assert.deepEqual(group.entries.map((e) => e.view || e.href || e.action || (e.fold ? 'fold' : null)), [
       'admin', 'observability',
       links.library + '/observability', links.library + '/explain', links.library + '/vectordb', links.library + '/operations', links.library + '/book-queue',
-      'workflow', 'runs', 'fold', 'https://app.slack.com/client/T0BG19JLPF1/C0BGLC0055J',
+      'workflow', 'runs', 'fold', 'https://app.slack.com/client/T0BG19JLPF1/C0BGLC0055J', 'page-text',
     ], tab);
     // every in-app entry carries its view as its id (so aria-current can be set from the tab); the links leave the product
     for (const item of group.entries) {
       if (item.view) { assert.equal(item.id, item.view); assert.equal(item.href, undefined); }
-      else if (!item.fold) assert.equal(item.external, true, item.id);
+      else if (!item.fold && !item.action) assert.equal(item.external, true, item.id);
     }
+    // 'Edit the text on this page' is a control this page provides, not an address: it turns on in-place editing.
+    const edit = group.entries[group.entries.length - 1];
+    assert.deepEqual([edit.id, edit.label, edit.action, edit.href, edit.view], ['page-text', 'Edit the text on this page', 'page-text', undefined, undefined]);
   }
   // the Library reader's pages follow the session's library link, wherever it is; without one they keep the public address
   const local = byId(panelGroups({user: ROOT, links: {library: 'http://localhost:3001/reader/'}}), 'admin');
@@ -221,10 +240,18 @@ test('the standard groups agree with app/panel.json, the copy of the hub\'s pane
   assert.deepEqual(flat(STANDARD.admin.entries), flat(group('admin').entries));
   assert.deepEqual(STANDARD.admin.roles, group('admin').roles);
   assert.deepEqual(flat(STANDARD.docs.entries), flat(group('docs').entries));
+  assert.deepEqual(flat(STANDARD.signup.entries), flat(group('signup').entries));
+  assert.equal(STANDARD.signup.label, group('signup').label);
   assert.deepEqual(flat(STANDARD.account.entries), flat(group('account').entries));
-  const products = group('start').entries.find((e) => e.label === 'Products');
+  // the sub-groups hang under 'Choose a product' now, and the hub's Products group is labelled Products
+  assert.equal(group('start').label, 'Products');
+  const products = group('start').entries.find((e) => e.label === 'Choose a product');
   assert.deepEqual(STANDARD.products.sub.map((s) => ({id: s.id, label: s.label, entries: flat(s.entries)})),
     products.sub.map((s) => ({id: s.id, label: s.label, entries: flat(s.entries)})));
+  // the two removed steps are gone from the copy, so nothing here can bring them back
+  const everyLabel = copy.groups.flatMap((g) => g.entries.map((e) => e.label));
+  for (const gone of ['Use it with your own data', 'Keep improving']) assert.equal(everyLabel.includes(gone), false, gone);
+  assert.equal(copy.pageText, '/__hub/page-text');
   // the panel renders exactly these: the localised Admin group and the copy have the same labels in the same order
   const rendered = byId(admin(), 'admin').entries.flatMap((e) => (e.fold ? [e.label, ...e.entries.map((c) => c.label)] : [e.label]));
   const written = group('admin').entries.flatMap((e) => (e.sub ? [e.label, ...e.sub[0].entries.map((c) => c.label)] : [e.label]));
@@ -252,9 +279,9 @@ test('nothing wrong paints before hydration: the page names no product, no group
   assert.match(effect, /^ useEffect\(\(\)=>\{const params=new URLSearchParams\(window\.location\.search\);/);
   assert.match(effect, /\}setViewReady\(true\)\},\[\]\);\s*$/, 'the same effect declares the view ready, last, after the tab is set');
   assert.equal((page.match(/setViewReady\(true\)/g) || []).length, 1, 'and nothing else does');
-  assert.match(page, /<BrandHeader product=\{viewReady\?\(groupLabel==='Account'\?PRODUCT:groupLabel\):null\}\/>/, 'the header carries a product line only once the view is known');
+  assert.match(page, /<BrandHeader group=\{viewReady\?group:null\} product=\{viewReady\?\(groupLabel==='Account'\?PRODUCT:groupLabel\):null\}\/>/, 'the header carries a product line, and the group whose colour it takes, only once the view is known');
   assert.match(page, /<SidePanel [^>]*viewReady=\{viewReady\}/, 'the panel is told');
-  assert.match(page, /className="page-heading page-arrival">\{viewReady\?<div><div className=\{'eyebrow eyebrow--'\+group\}>\{groupLabel\}<\/div><h1>\{labels\[tab\]\}<\/h1>/, 'the pane\'s eyebrow and heading wait');
+  assert.match(page, /className="page-heading page-arrival">\{viewReady\?<div><div className=\{'eyebrow eyebrow--'\+group\}>\{groupLabel\}<\/div><h1 data-text=\{'jobsearch\.'\+tab\+'\.heading'\}>\{labels\[tab\]\}<\/h1>/, 'the pane\'s eyebrow and heading wait');
   assert.match(page, /\{viewReady&&\['matches','emailed'\]\.includes\(tab\)&&<SearchOverview/, 'so does the search overview');
   const panel = readFileSync(new URL('../app/SidePanel.tsx', import.meta.url), 'utf8');
   assert.match(panel, /const groups=\(viewReady\?panelGroups\(\{user:user\|\|null,links,own,signIn,tab\}\):\[\]\) as Group\[\]/, 'the panel is an empty shell until then');
@@ -271,7 +298,7 @@ test('inside the Admin pane, Observability\'s eyebrow says Admin in the admin ac
   assert.match(source, /<span className="eyebrow eyebrow--admin">Admin<\/span>/);
   assert.doesNotMatch(source, /eyebrow--product/);
   assert.match(source, /<h2>\{tool==='phoenix'\?'Explainability':'Observability'\} · Job Search<\/h2>/);
-  // the admin eyebrow is the tools accent wherever it appears, in the shell and in the pane
-  assert.match(readFileSync(new URL('../app/shell.css', import.meta.url), 'utf8'), /\.eyebrow--admin\{color:var\(--accent-tools\)\}/);
-  assert.match(readFileSync(new URL('../app/visual-theme.css', import.meta.url), 'utf8'), /\.pane \.eyebrow--admin,\.pane \.eyebrow--tools\{color:var\(--accent-tools\)\}/);
+  // the admin eyebrow is the tools accent's darker heading shade wherever it appears, in the shell and in the pane
+  assert.match(readFileSync(new URL('../app/shell.css', import.meta.url), 'utf8'), /\.eyebrow--admin\{color:var\(--accent-tools-strong\)\}/);
+  assert.match(readFileSync(new URL('../app/visual-theme.css', import.meta.url), 'utf8'), /\.pane \.eyebrow--admin,\.pane \.eyebrow--tools\{color:var\(--accent-tools-strong\)\}/);
 });

@@ -17,6 +17,7 @@ from src.applications.archives import archive_for,require_active,archive_if_emai
 from ai_core.agents.supervisor import enqueue
 from src.applications.learning import current as learning_model,explain as learning_explain,configure as configure_learning,ranking_sql
 from src.applications.job_filters import STATE_VALUES,TITLE_VALUES,facet_summary
+from src.applications.disciplines import parse as parse_disciplines,pattern_for as discipline_pattern
 from src.auth import api_keys
 
 cfg=settings()
@@ -221,10 +222,15 @@ def prep_identity(user=Depends(current_user)):
 def jobs(q:str=Query('',max_length=200),date:Literal['any','24h','7d','30d']='any',level:str='',
          mode:Literal['','Remote','Hybrid','On-site','Unknown']='',view:Literal['matches','review','saved','emailed','archive']='matches',
          page:int=Query(1,ge=1),show_dismissed:bool=False,user=Depends(current_user),sort:Literal['newest','recommended']='newest',
-         state:str=Query('',max_length=12),title:str=Query('',max_length=80)):
+         state:str=Query('',max_length=12),title:str=Query('',max_length=80),discipline:str=Query('',max_length=400)):
     if view=='review' and not is_administrator(user): raise HTTPException(403,'Administrator role required')
     if state and state not in STATE_VALUES: raise HTTPException(422,'Unknown state')
     if title and title not in TITLE_VALUES: raise HTTPException(422,'Unknown job title')
+    # The Discipline filter (the owner, 18 Sep 2026): several may be chosen; a listing passes when its title or
+    # description matches any of them (src/applications/disciplines.py). It sits with the other clauses, so the
+    # State and Job title facets are counted under the chosen disciplines as they are under every other filter.
+    try: disciplines=parse_disciplines(discipline)
+    except ValueError: raise HTTPException(422,'Unknown discipline')
     clauses=[] if view in ('emailed','archive') else ["j.availability='observed_open'"]; values=[]
     if view=='review': clauses.append("j.match_status='review'")
     elif view not in ('emailed','archive'): clauses.append("j.match_status='match' AND j.country_status IN ('us_based','us_remote_eligible')")
@@ -237,6 +243,9 @@ def jobs(q:str=Query('',max_length=200),date:Literal['any','24h','7d','30d']='an
     if date!='any':
         clauses.append("j.posted_at >= now() - (%s * interval '1 hour') AND j.posted_at <= now()")
         values.append({'24h':24,'7d':168,'30d':720}[date])
+    if disciplines:
+        clauses.append("(coalesce(j.title,'')||' '||coalesce(j.description,'')) ~* %s")
+        values.append(discipline_pattern(disciplines))
     clauses.append('a.archived_at IS NOT NULL' if view=='archive' else 'a.archived_at IS NULL')
     if not show_dismissed and view!='archive': clauses.append('d.reason IS NULL')
     # OFFSET 0 keeps this scalar LATERAL result from being flattened back into
@@ -485,3 +494,7 @@ def daily_workflow_status(user=Depends(current_user)):
 
 from src.api.enquiries import create_router as enquiries_router
 app.include_router(enquiries_router())
+
+from src.api.page_text import create_router as page_text_router
+# The shared text store every Bagala surface reads its administrator-edited copy from: public GET, administrator PUT.
+app.include_router(page_text_router(administrator))

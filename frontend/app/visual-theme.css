@@ -2,13 +2,14 @@
 /* Component tokens on the Bagala gold palette (brand tokens live in globals.css). */
 :root{--title:var(--ink);--card-line:var(--line);--card-top:var(--line);--card-accent:var(--header-gold);--card-accent-hover:#6E5200;--header-bg:linear-gradient(90deg,var(--header-gold),var(--header-gold-2));--header-line:#B8892A;--motion-bg:var(--bg-gold);--overview-bg:linear-gradient(110deg,var(--surface-2),var(--surface));--overview-line:var(--line);--steps-bg:var(--surface);--chip-bg:var(--bg-gold-deep);--chip-line:var(--line);--chip-ink:var(--ink);--region-bg:var(--surface-2);--region-ink:var(--ink);--region-line:var(--line);--tag-bg:var(--surface-2);--tag-ink:var(--ink-muted);--badge-bg:var(--surface-2);--badge-ink:var(--ink);--nav-active-bg:var(--surface);--sidebar-bg:var(--bg-gold-deep)}
 body{font-family:var(--font);color:var(--ink);background:var(--paper)}
-.content{padding-top:30px}.page-heading{margin-bottom:22px}.page-heading h1{font-family:inherit;font-weight:800;letter-spacing:-.02em}
+/* The owner's note of 18 Sep 2026 - about a third less vertical space: the pane's sections, cards and rows. */
+.content{padding-top:20px}.page-heading{margin-bottom:14px}.page-heading h1{font-family:inherit;font-weight:800;letter-spacing:-.02em}
 .primary{background:var(--green);box-shadow:none}.primary:hover{filter:brightness(1.25)}.secondary{border-color:var(--card-line);box-shadow:none}.secondary:hover{border-color:var(--line-strong);background:var(--surface-2)}.icon-button{color:var(--muted)}.icon-button:hover{background:var(--surface-3)}
-.search-overview{background:var(--surface);border:1px solid var(--card-line);border-radius:16px;overflow:hidden;margin:0 0 22px;box-shadow:var(--shadow)}
-.overview-intro{display:grid;grid-template-columns:1fr 360px;align-items:center;padding:25px 28px;background:var(--overview-bg);gap:12px}
+.search-overview{background:var(--surface);border:1px solid var(--card-line);border-radius:16px;overflow:hidden;margin:0 0 14px;box-shadow:var(--shadow)}
+.overview-intro{display:grid;grid-template-columns:1fr 360px;align-items:center;padding:16px 20px;background:var(--overview-bg);gap:12px}
 .overview-kicker{font-size:12px;font-weight:750;letter-spacing:1.5px;color:var(--region-ink);display:flex;align-items:center;gap:8px}.overview-kicker>span{height:7px;width:7px;border-radius:50%;background:var(--header-gold)}
-.overview-intro h2{font-size:27px;line-height:1.25;letter-spacing:-.6px;margin:12px 0;color:var(--title)}.overview-intro p{font-size:12px;color:var(--muted);line-height:1.7;margin:0}.private-note{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tint-ink);margin-top:14px}.career-illustration{width:100%;height:auto;max-height:190px}
-.overview-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;padding:20px 24px}.overview-step{display:flex;gap:12px;align-items:center;min-width:0}.overview-step strong{font-size:12px;color:var(--title)}.overview-step p{margin:5px 0 0;color:var(--muted);font-size:12px;line-height:1.55}.step-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;flex-shrink:0}.step-arrow{margin-left:auto;color:var(--muted);flex-shrink:0}
+.overview-intro h2{font-size:27px;line-height:1.15;letter-spacing:-.6px;margin:6px 0;color:var(--title)}.overview-intro p{font-size:12px;color:var(--muted);line-height:1.45;margin:0}.private-note{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--tint-ink);margin-top:8px}.career-illustration{width:100%;height:auto;max-height:190px}
+.overview-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:12px 16px}.overview-step{display:flex;gap:12px;align-items:center;min-width:0}.overview-step strong{font-size:12px;color:var(--title)}.overview-step p{margin:3px 0 0;color:var(--muted);font-size:12px;line-height:1.4}.step-icon{display:grid;place-items:center;width:42px;height:42px;border-radius:12px;flex-shrink:0}.step-arrow{margin-left:auto;color:var(--muted);flex-shrink:0}
 .collection-panel{background:var(--surface);border-color:var(--card-line);border-left:3px solid var(--header-gold);border-radius:10px;color:var(--ink);font-size:13px}.collection-panel summary{font-weight:600}.collection-panel p{line-height:1.65}.collection-panel select,.job-next-action select{border:1px solid var(--input-line);border-radius:6px;padding:7px;max-width:100%;background:var(--input-bg);color:var(--ink)}
 .filters{border-radius:12px;box-shadow:none}.filters label{color:var(--muted);letter-spacing:.2px}.filters select{color:var(--ink)}.filters .search{color:var(--muted)}.result-line{margin-top:22px}
 .job-card{border-radius:13px;border-color:var(--card-line);box-shadow:var(--shadow);border-left:3px solid var(--card-accent)}.job-card:hover{border-color:var(--line-strong)}.company-avatar{border:0;background:var(--bg-gold-deep);color:var(--ink-block);font-size:14px;font-weight:800}
@@ -80,13 +81,15 @@ a{color:inherit}.brand-page a:focus-visible,.brand-page button:focus-visible{out
 h1,h2,h3{color:var(--ink-block)}h1{font-weight:800}h2,h3{font-weight:750}
 strong,b,th,summary,legend,label{font-weight:700}
 .muted,.small,.filter-note,.page-heading p,.job-meta,.company-line,.company-line span,.result-line,.pagination,dt,.account-panel>p,.account-facts dt,.description,.ac-caption,.ac-source,.ac-note,.ac-toolbar p,.job-next-action p,.empty,.private-note,.overview-intro p,.overview-step p,.source-state,.source-stages span,.collection-source small,.intake-panel small,.hint,.login-form .hint,.signin-tags,.signin-card p{color:var(--ink-muted)}
-.pane[data-group="product"]{--group-accent:var(--accent-product)}.pane[data-group="account"]{--group-accent:var(--accent-account)}.pane[data-group="admin"]{--group-accent:var(--accent-tools)}.pane[data-group="data"]{--group-accent:var(--accent-data)}
+/* The pane takes its group's colours: the entries' accent, and the darker label shade for its headings and its
+   eyebrow, so 'Job Search'/'Admin' over a screen reads as a heading and not as another entry. */
+.pane[data-group="product"]{--group-accent:var(--accent-product-strong);--group-label:var(--accent-product-strong)}.pane[data-group="account"]{--group-accent:var(--accent-account-strong);--group-label:var(--accent-account-strong)}.pane[data-group="admin"]{--group-accent:var(--accent-tools-strong);--group-label:var(--accent-tools-strong)}.pane[data-group="data"]{--group-accent:var(--accent-data-strong);--group-label:var(--accent-data-strong)}
 .pane h1,.pane h2,.pane .eyebrow,.pane .overview-kicker,.pane .monitor-heading .eyebrow{color:var(--group-accent,var(--ink-block))}
 .pane .page-heading .eyebrow{display:inline-block;background:transparent;border:0;padding:0;margin-bottom:6px;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
 .pane .empty h2,.pane .job-next-action summary,.pane .collection-panel summary{color:var(--ink-block)}
 th,.status-heading,.footer-cols h2,.ac-table th,.eyebrow{color:var(--ink-block);font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-.pane .eyebrow--product{color:var(--accent-product)}.pane .eyebrow--account{color:var(--accent-account)}.pane .eyebrow--admin,.pane .eyebrow--tools{color:var(--accent-tools)}.pane .eyebrow--data{color:var(--accent-data)}.pane .eyebrow--docs{color:var(--accent-docs)}
-.signin-card .eyebrow{color:var(--accent-account)}.detail-modal .eyebrow{color:var(--accent-product)}.detail-modal .eyebrow--account{color:var(--accent-account)}
+.pane .eyebrow--product{color:var(--accent-product-strong)}.pane .eyebrow--account{color:var(--accent-account-strong)}.pane .eyebrow--admin,.pane .eyebrow--tools{color:var(--accent-tools-strong)}.pane .eyebrow--data{color:var(--accent-data-strong)}.pane .eyebrow--docs{color:var(--accent-docs-strong)}
+.signin-card .eyebrow{color:var(--accent-account-strong)}.detail-modal .eyebrow{color:var(--accent-product-strong)}.detail-modal .eyebrow--account{color:var(--accent-account-strong)}
 .filters label{color:var(--ink-block);font-weight:700;font-size:13px}.filter-name{display:inline-flex;align-items:center;gap:6px}.filters .search{color:var(--ink-block)}.filters select{font-weight:600;color:var(--ink)}
 .dismissed-filter{font-weight:700;color:var(--ink-block)}.dismissed-filter .side__icon{margin-left:4px}
 .job-title{color:var(--ink-block);font-weight:750}.job-title:hover{color:var(--accent-product)}
@@ -111,7 +114,7 @@ th,.status-heading,.footer-cols h2,.ac-table th,.eyebrow{color:var(--ink-block);
 .account-panel:nth-of-type(5) h2 svg{animation:opt-orbit 5s ease-in-out infinite}
 .account-panel:nth-of-type(6) h2 svg{animation:opt-bounce 2.5s ease-in-out infinite}
 .lock-icon svg{animation:opt-pulse 3s ease-in-out infinite}
-.pane .account-panel h2,.pane .signin-card h2{color:var(--accent-account)}
+.pane .account-panel h2,.pane .signin-card h2{color:var(--accent-account-strong)}
 /* Dialogs and the detail sheet on the cream surface */
 .detail-modal{background:var(--surface);color:var(--ink)}.detail-modal h2{color:var(--ink-block)}.detail-modal dl{color:var(--ink)}
 .secondary,.primary{font-weight:700}.link-button{font-weight:700}
