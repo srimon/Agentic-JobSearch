@@ -1,0 +1,232 @@
+{
+  "title": "Deep Learning Agents",
+  "site": "https://www.bagala.ai",
+  "account": "https://bagala.ai/account/",
+  "session": "/__hub/session",
+  "logout": "/__hub/logout",
+  "notes": [
+    "The left panel every page wears (the public site, the Products page, the account screen, the products). One source: a page renders these groups in this order, then its own group and 'On this page'.",
+    "An entry with 'pane' names a section of the site's home page (the address is the site plus '#' and the pane); 'step' numbers the Get started steps; 'action' is a control the page provides (the Email Admin dialog); 'sub' nests labelled sub-groups inside an entry.",
+    "A group with 'roles' is carried hidden and shown by the shell script when /__hub/session on the page's own origin answers with a user holding one of those roles. The Account group shows the visitor's name and Sign out for any signed-in visitor.",
+    "Job Search views (?view=...) open at the Job Search address the page knows: the public short path here; a page served on the loopback derives them from its directory (apps/hub-portal/src/links.ts).",
+    "A sub-group whose id is 'data' (Admin > Data management) is folded: its row is closed until pressed, open on its own pages, and closes again when another entry is chosen; it carries the data accent."
+  ],
+  "groups": [
+    {
+      "id": "start",
+      "label": "Get started",
+      "entries": [
+        {
+          "label": "Welcome",
+          "href": "https://www.bagala.ai/",
+          "pane": "welcome"
+        },
+        {
+          "label": "Products",
+          "href": "https://www.bagala.ai/#products",
+          "pane": "products",
+          "sub": [
+            {
+              "id": "relax",
+              "label": "Relax",
+              "entries": [
+                {
+                  "label": "Ask about a Book",
+                  "href": "https://bagala.ai/library/reader"
+                }
+              ]
+            },
+            {
+              "id": "jobs",
+              "label": "Job",
+              "entries": [
+                {
+                  "label": "Job Search",
+                  "href": "https://bagala.ai/jobsearch/"
+                },
+                {
+                  "label": "Interview Preparation",
+                  "href": "https://bagala.ai/jobprep/"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "Create your account",
+          "href": "https://www.bagala.ai/#create-your-account",
+          "pane": "create-your-account",
+          "step": 1
+        },
+        {
+          "label": "Choose a product",
+          "href": "https://www.bagala.ai/#choose-a-product",
+          "pane": "choose-a-product",
+          "step": 2
+        },
+        {
+          "label": "Use it with your own data",
+          "href": "https://www.bagala.ai/#use-your-own-data",
+          "pane": "use-your-own-data",
+          "step": 3
+        },
+        {
+          "label": "Keep improving",
+          "href": "https://www.bagala.ai/#keep-improving",
+          "pane": "keep-improving",
+          "step": 4
+        }
+      ]
+    },
+    {
+      "id": "docs",
+      "label": "Documentation",
+      "entries": [
+        {
+          "label": "Overview",
+          "href": "https://www.bagala.ai/docs"
+        },
+        {
+          "label": "Create Account",
+          "href": "https://www.bagala.ai/docs/create-account"
+        },
+        {
+          "label": "Ask the Book",
+          "href": "https://www.bagala.ai/docs/read-books"
+        },
+        {
+          "label": "Job Search",
+          "href": "https://www.bagala.ai/docs/job-search"
+        },
+        {
+          "label": "Training",
+          "href": "https://www.bagala.ai/docs/interview-preparation"
+        },
+        {
+          "label": "Help and troubleshooting",
+          "href": "https://www.bagala.ai/help"
+        },
+        {
+          "label": "Resources",
+          "href": "https://www.bagala.ai/#resources",
+          "pane": "resources"
+        }
+      ]
+    },
+    {
+      "id": "admin",
+      "label": "Admin",
+      "roles": [
+        "administrator"
+      ],
+      "entries": [
+        {
+          "label": "Admin console",
+          "href": "https://bagala.ai/jobsearch/?view=admin"
+        },
+        {
+          "label": "Observability – Job Search",
+          "href": "https://bagala.ai/jobsearch/?view=observability"
+        },
+        {
+          "label": "Observability – Ask about a Book",
+          "href": "https://bagala.ai/library/reader/observability"
+        },
+        {
+          "label": "Explain",
+          "href": "https://bagala.ai/library/reader/explain"
+        },
+        {
+          "label": "VectorDB",
+          "href": "https://bagala.ai/library/reader/vectordb"
+        },
+        {
+          "label": "Library operations",
+          "href": "https://bagala.ai/library/reader/operations"
+        },
+        {
+          "label": "Daily workflow",
+          "href": "https://bagala.ai/jobsearch/?view=workflow"
+        },
+        {
+          "label": "Agents and activity",
+          "href": "https://bagala.ai/jobsearch/?view=runs"
+        },
+        {
+          "label": "Data management",
+          "sub": [
+            {
+              "id": "data",
+              "label": "Data management",
+              "entries": [
+                {
+                  "label": "ClickHouse",
+                  "href": "https://bagala.ai/jobsearch/?view=data-clickhouse"
+                },
+                {
+                  "label": "Great Expectations",
+                  "href": "https://bagala.ai/jobsearch/?view=data-gx"
+                },
+                {
+                  "label": "SODA",
+                  "href": "https://bagala.ai/jobsearch/?view=data-soda"
+                },
+                {
+                  "label": "PostgreSQL · SchemaSpy",
+                  "href": "https://bagala.ai/jobsearch/?view=model"
+                },
+                {
+                  "label": "OpenMetadata · Catalog",
+                  "href": "https://bagala.ai/jobsearch/?view=data-catalog"
+                },
+                {
+                  "label": "OpenMetadata",
+                  "href": "https://bagala.ai/jobsearch/?view=data-governance"
+                },
+                {
+                  "label": "OpenMetadata · Lineage",
+                  "href": "https://bagala.ai/jobsearch/?view=data-lineage"
+                },
+                {
+                  "label": "ML feature dataset",
+                  "href": "https://bagala.ai/jobsearch/?view=data-science"
+                },
+                {
+                  "label": "ClickHouse ingestion",
+                  "href": "https://bagala.ai/jobsearch/?view=data-ingestion"
+                },
+                {
+                  "label": "dbt Core",
+                  "href": "https://bagala.ai/jobsearch/?view=data-dbt"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "label": "Slack",
+          "href": "https://app.slack.com/client/T0BG19JLPF1/C0BGLC0055J"
+        }
+      ]
+    },
+    {
+      "id": "account",
+      "label": "Account",
+      "entries": [
+        {
+          "label": "Sign in",
+          "href": "https://bagala.ai/account/"
+        },
+        {
+          "label": "Protected Account",
+          "href": "https://www.bagala.ai/#trust",
+          "pane": "trust"
+        },
+        {
+          "label": "Email Admin",
+          "action": "enquiry"
+        }
+      ]
+    }
+  ]
+}

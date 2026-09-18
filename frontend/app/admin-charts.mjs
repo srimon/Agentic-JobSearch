@@ -11,13 +11,37 @@
  * @typedef {{width:number,height:number,left:number,right:number,top:number,bottom:number}} Box
  */
 
-/** The drawing area every line chart uses. The svg scales to its card; the viewBox does not. */
-export const CHART_BOX = {width: 620, height: 210, left: 52, right: 14, top: 14, bottom: 34};
+/**
+ * The drawing area every line chart uses (compressed 18 Sep 2026: 140 high, from 210). The console measures each
+ * card and draws with the card's own width in place of this one, so a chart is never scaled: its 13px labels stay
+ * 13px whether the cards sit in one column or three. This width is the one drawn before the first measurement.
+ */
+export const CHART_BOX = {width: 360, height: 140, left: 50, right: 10, top: 10, bottom: 24};
+
+/** The sparkline's box (180 by 36, from 220 by 46). */
+export const SPARK_BOX = {width: 180, height: 36};
+
+/**
+ * How many series tones there are (admin-console.css .ac-tone1 to .ac-tone10): the group accents and the dark
+ * inks, each at least 7:1 on the gold grounds, so a legend can be set in its series' colour.
+ */
+export const TONES = 10;
 
 /** @param {number} value */
 const round = (value) => Math.round(value * 1e6) / 1e6;
 /** @param {unknown} value */
 const finite = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : Number.isFinite(Number(value)) ? Number(value) : 0);
+
+/**
+ * The tone (1 to TONES) for the n-th series, bar or segment of a chart, cycling so every row of a long list has a
+ * colour and no two neighbours share one. Anything that is not a whole number counts as the first.
+ * @param {number} index
+ * @returns {number}
+ */
+export function tone(index) {
+ const position = Math.max(0, Math.floor(finite(index)));
+ return (position % TONES) + 1;
+}
 
 /**
  * Round a number up to a friendly step: 1, 2, 2.5, 5 or 10 times a power of ten. Never 0, so it is
@@ -139,8 +163,8 @@ export function stackSegments(parts) {
  * @param {{width?:number,height?:number,pad?:number}} [box]
  */
 export function sparkline(values, box = {}) {
- const width = box.width || 160;
- const height = box.height || 40;
+ const width = box.width || SPARK_BOX.width;
+ const height = box.height || SPARK_BOX.height;
  const pad = box.pad === undefined ? 3 : box.pad;
  const list = (values || []).map(finite);
  const top = Math.max(...list, 0) || 1;

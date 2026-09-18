@@ -6,7 +6,7 @@ import DataQuality from './DataQuality';
 import Analytics from './Analytics';
 import DataModel from './DataModel';
 import Governance from './Governance';
-/* The Data management entries themselves live in the left panel (panel.mjs, SidePanel.tsx: a sub-group of Job Search for administrators). */
+/* The Data management entries themselves live in the left panel (panel.mjs, SidePanel.tsx: the folded sub-group of the Admin group, for administrators). */
 const heroIcons:Record<string,IconName>={clickhouse:'database',gx:'shield',soda:'shield',model:'document',catalog:'book',governance:'shield',lineage:'chart',science:'orbit',ingestion:'upload',dbt:'code',dag:'clock'};
 export default function DataManagement({tab,version}:{tab:string;version:number}){
  const id=tab.replace('data-','');const tool=dataGroups.flatMap(g=>g.tools).find(t=>t.id===id);

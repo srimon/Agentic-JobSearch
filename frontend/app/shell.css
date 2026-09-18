@@ -20,10 +20,11 @@
   --header-gold-2:#DDB449;
   --surface:#FFFAEB;
   --surface-2:#FBF1D2;
-  /* Text: dark shades only. Body ink, a darker ink for block (uppercase) labels, a dark brown for secondary copy. */
+  /* Text: dark shades only. Body ink, a darker ink for block (uppercase) labels, a deep brown for secondary copy
+     (darkened 18 September 2026 at the owner's request; every shade stays at least 7:1 on the gold grounds). */
   --ink:#1D180C;
   --ink-block:#0F0C05;
-  --ink-muted:#4A3B16;
+  --ink-muted:#362A0D;
   --line:#D9BF6E;
   --line-strong:#9C7420;
   --primary:#1D180C;
@@ -37,6 +38,7 @@
   --accent-docs:#4B2A0A;
   --accent-account:#5B0F1B;
   --accent-tools:#1E2A3B;
+  --accent-data:#2F3A0B; /* the Data management fold: a deep olive of its own */
   --accent-page:#0F0C05;
   /* The product's own group (Job Search): a deep plum, 10.6:1 on the panel and 9.1:1 on the honey shade. */
   --accent-product:#3F0E47;
@@ -92,12 +94,23 @@ h1,h2,h3{line-height:1.15;letter-spacing:-.015em;text-wrap:balance;color:var(--i
 .side__group--account{--group-accent:var(--accent-account)}
 .side__group--tools{--group-accent:var(--accent-tools)}
 .side__group--page{--group-accent:var(--accent-page)}
+.side__group--admin{--group-accent:var(--accent-tools)}
 .side__group--product{--group-accent:var(--accent-product)}
-.side__group--data{--group-accent:var(--accent-tools)}
+.side__group--data{--group-accent:var(--accent-data)}
 .side__label{font-size:12.5px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--group-accent);margin:0 12px 6px}
-/* Sub-groups inside an entry (Products > Relax, Job; Job Search > Data management): a thin rule, the sub-group's own accent */
+/* Sub-groups inside an entry (Products > Relax, Job): a thin rule, the sub-group's own accent */
 .side__sub{margin:4px 0 6px 18px;padding-left:10px;border-left:2px solid rgba(29,24,12,.16)}
 .side__sub .side__label{font-size:11.5px;margin:6px 12px 2px}
+/* A folded sub-group (Admin > Data management): closed until its row is pressed, open on its own pages; the
+   summary is an entry row, the mark turns, and leaving the group (any other entry) closes it again */
+.side__fold{margin:2px 0 4px}
+.side__fold>summary{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;border:1px solid transparent;color:var(--group-accent);font:600 15px/1.35 var(--font);cursor:pointer;list-style:none}
+.side__fold>summary::-webkit-details-marker{display:none}
+.side__fold>summary:hover{background:var(--gold-200);border-color:var(--line)}
+.side__fold>summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--group-accent);border-bottom:2px solid var(--group-accent);transform:rotate(-45deg);transition:transform .2s}
+.side__fold[open]>summary{background:var(--gold-200)}
+.side__fold[open]>summary::after{transform:rotate(45deg)}
+.side__fold>.side__list{margin:2px 0 4px 18px;padding-left:10px;border-left:2px solid rgba(29,24,12,.16)}
 .side__sublabel{font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--group-accent);margin:12px 12px 4px}
 .side__list{list-style:none;margin:0;padding:0;display:grid;gap:2px}
 .side__list a,.side__button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--group-accent);font:600 15px/1.35 var(--font);text-align:left;text-decoration:none;cursor:pointer}
@@ -133,8 +146,9 @@ h1,h2,h3{line-height:1.15;letter-spacing:-.015em;text-wrap:balance;color:var(--i
 .eyebrow--docs{color:var(--accent-docs)}
 .eyebrow--account{color:var(--accent-account)}
 .eyebrow--tools{color:var(--accent-tools)}
+.eyebrow--admin{color:var(--accent-tools)}
 .eyebrow--product{color:var(--accent-product)}
-.eyebrow--data{color:var(--accent-tools)}
+.eyebrow--data{color:var(--accent-data)}
 
 /* Ordered guides: vertical steps, one full-width row each - the number, an animated icon, the title, the text */
 .guide{list-style:none;margin:0;padding:0;counter-reset:guide;display:grid;grid-template-columns:1fr;gap:12px}

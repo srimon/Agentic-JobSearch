@@ -3,7 +3,7 @@
    screens are mapped onto the brand values so every screen restyles without markup changes. */
 :root{color-scheme:light;
  --bg-gold:#F5E4A8;--bg-gold-deep:#EED58A;--header-gold:#C99A2E;--header-gold-2:#DDB449;--surface:#FFFAEB;--surface-2:#FBF1D2;
- --ink:#1D180C;--ink-muted:#5E4F28;--line:#D9BF6E;--primary:#1D180C;--primary-ink:#F7DB85;--focus:#6E5200;
+ --ink:#1D180C;--ink-muted:#362A0D;--line:#D9BF6E;--primary:#1D180C;--primary-ink:#F7DB85;--focus:#6E5200;
  --ok:#2E6B2F;--warn:#8A5A00;--danger:#9B2C1F;--radius:10px;
  --font:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",Arial,sans-serif;
  --muted:var(--ink-muted);--green:var(--primary);--on-green:var(--primary-ink);--paper:var(--bg-gold);--accent:var(--primary-ink);

@@ -7,9 +7,42 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {axisScale, barRows, CHART_BOX, funnelBars, labelIndexes, niceCeil, seriesMax, shapeSeries, sparkline, stackSegments} from '../app/admin-charts.mjs';
+import {readFileSync} from 'node:fs';
+
+import {axisScale, barRows, CHART_BOX, funnelBars, labelIndexes, niceCeil, seriesMax, shapeSeries, SPARK_BOX, sparkline, stackSegments, TONES, tone} from '../app/admin-charts.mjs';
 
 const days = (...values) => [{key: 'a', label: 'A', values}];
+
+test('the chart box is the compressed one (18 Sep 2026): 140 high with a small top and bottom, and the spark 180 by 36', () => {
+ assert.equal(CHART_BOX.height, 140);
+ assert.ok(CHART_BOX.top <= 12 && CHART_BOX.bottom <= 26, 'small top and bottom');
+ assert.ok(CHART_BOX.height - CHART_BOX.top - CHART_BOX.bottom >= 100, 'room for the plot');
+ assert.deepEqual(SPARK_BOX, {width: 180, height: 36});
+ const line = sparkline([1, 2]);
+ assert.equal(line.width, 180);
+ assert.equal(line.height, 36);
+ // the console draws with the card's measured width in place of the default one, so any width must shape cleanly
+ for (const width of [200, 233, 360, 470, 900]) {
+  const shape = shapeSeries(days(1, 5, 3), {...CHART_BOX, width});
+  assert.equal(shape.series[0].points[0].x, CHART_BOX.left, String(width));
+  assert.equal(shape.series[0].points[2].x, width - CHART_BOX.right, String(width));
+ }
+});
+
+test('ten tones cycle so every series, bar and segment has a colour, and every tone the console names exists in its stylesheet', () => {
+ assert.equal(TONES, 10);
+ assert.deepEqual([0, 1, 2, 9, 10, 11, 19, 20].map(tone), [1, 2, 3, 10, 1, 2, 10, 1]);
+ assert.equal(tone(-1), 1);
+ assert.equal(tone(NaN), 1);
+ assert.equal(tone(2.7), 3);
+ const css = readFileSync(new URL('../app/admin-console.css', import.meta.url), 'utf8');
+ for (let index = 1; index <= TONES; index += 1) assert.match(css, new RegExp('\\.ac-tone' + index + '\\{--tone:var\\(--[a-z-]+\\)\\}'), 'tone ' + index);
+ assert.match(css, /\.ac-tone-panel\{--tone:var\(--panel-accent/, 'a single series takes the panel accent');
+ for (const accent of ['relax', 'jobs', 'account', 'start']) assert.match(css, new RegExp('\\.ac-panel--' + accent + '\\{--panel-accent:var\\(--accent-' + accent + '\\)\\}'), accent);
+ // brand tokens only: no literal colour anywhere in the stylesheet
+ assert.equal(css.match(/#[0-9a-fA-F]{3,8}\b/g), null, 'no literal colour');
+ assert.equal(css.match(/\b(?:rgb|hsl)a?\(/g), null, 'no literal colour function');
+});
 
 test('a friendly ceiling is never zero and never below the value', () => {
  assert.equal(niceCeil(0), 1);

@@ -6,12 +6,12 @@ import {PRODUCT,SITE,SITE_TITLE} from './panel.mjs';
 
 const THANKS='Thank you. Your message has been sent.';
 
-/** The standard header (BRAND.md, the public site): the "B" mark, the wordmark, the site title with the product's name under it. Nothing else: every selection lives in the left panel. */
-export function BrandHeader(){
+/** The standard header (BRAND.md, the public site): the "B" mark, the wordmark, the site title with the product's name under it ('Admin' on an admin view). Nothing else: every selection lives in the left panel. */
+export function BrandHeader({product=PRODUCT}:{product?:string}){
  return <header className="site-header">
   <div className="wrap site-header__inner">
    <a className="brand" href={SITE+'/'}><span className="brand__mark" aria-hidden="true">B</span><span>Bagala</span></a>
-   <span className="site-header__title">{SITE_TITLE}<span className="site-header__product">{PRODUCT}</span></span>
+   <span className="site-header__title">{SITE_TITLE}<span className="site-header__product">{product}</span></span>
   </div>
  </header>;
 }

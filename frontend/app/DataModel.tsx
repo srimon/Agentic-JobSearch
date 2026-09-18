@@ -13,7 +13,7 @@ export default function DataModel({version}:{version:number}){
  {data?.status==='not_generated'&&<p className="empty">No model has been generated yet. Run the diagram generator.</p>}
  {data?.status==='ready'&&<><div className="dq-summary"><article><span>Engine</span><strong><Database size={20}/>SchemaSpy</strong></article><article><span>Tables</span><strong>{data.metadata?.tables}</strong></article><article><span>Declared foreign keys</span><strong>{data.metadata?.foreign_keys}</strong></article><article><span>Schema captured</span><strong style={{fontSize:16}}>{new Date(data.generated_at!).toLocaleString()}</strong></article></div>
  <p className="muted">Select Relationships in the report for the diagram, or a table for its columns and connections. Reload retrieves the last snapshot; regeneration is an operator CLI action. Views, routines, defaults, comments and application records are excluded. No inferred relationships.</p>
- <iframe key={String(version)+'-'+refresh} title="SchemaSpy PostgreSQL model" src={apiPath('/data-model/report/index.html')} sandbox="allow-scripts allow-same-origin" referrerPolicy="no-referrer" style={{width:'100%',height:'78vh',minHeight:600,border:'1px solid #ccd6e3',borderRadius:14,background:'#fff'}}/>
+ <iframe key={String(version)+'-'+refresh} title="SchemaSpy PostgreSQL model" src={apiPath('/data-model/report/index.html')} sandbox="allow-scripts allow-same-origin" referrerPolicy="no-referrer" style={{width:'100%',height:'78vh',minHeight:600,border:'1px solid var(--line)',borderRadius:14,background:'var(--input-bg)'}}/>
  </>}
  </section>
 }

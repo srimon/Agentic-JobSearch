@@ -25,7 +25,7 @@ import SidePanel from './SidePanel';
 import {MotionIcon} from './Icons';
 import {isOwnAddress} from './paths';
 import {accountScreen,signedOutLanding} from './account-screen.mjs';
-import {viewGroup} from './panel.mjs';
+import {ADMIN_VIEWS,GROUP_LABELS,PRODUCT,viewGroup} from './panel.mjs';
 import {api,type Session,resolveLinks,prepStartUrl,isAdministrator,HubLinksContext,signOutToSignIn,describeError,safeNext,rememberNext,whenSessionEnds,appPath} from './session';
 
 import {CircleCheck,TriangleAlert,Clock3,LockKeyhole,Bookmark,ArrowUpRight,MapPin,BriefcaseBusiness,ChevronLeft,ChevronRight,RefreshCw,X,SlidersHorizontal} from 'lucide-react';
@@ -98,7 +98,9 @@ export default function Home(){
  // One sign-out for the header and the sidebar: ends the shared session, then the sign-in screen.
  async function signOut(){if(signingOut)return;setSigningOut(true);try{await signOutToSignIn()}catch(e){setError(describeError(e));setSigningOut(false)}}
 
- useEffect(()=>{const params=new URLSearchParams(window.location.search);if(['workflow','matches','emailed','archive','saved','sources','observability','admin','quality','model','governance','runs','account','data-slack',...dataGroups.flatMap(g=>g.tools.map(t=>'data-'+t.id))].includes(params.get('view')||'')){setTab(params.get('view')!);setDate(params.get('view')==='archive'?'any':'24h');setShowDismissed(params.get('view')==='emailed')}},[]);
+ // ?view= names the screen to open: every view choose() can write (the workspace, the account, every admin and data
+ // view), so a reload, Back or a link from another product's panel lands on the same screen.
+ useEffect(()=>{const params=new URLSearchParams(window.location.search);const views=['matches','emailed','archive','saved','intake','applications','review','sources','quality','governance','account',...ADMIN_VIEWS,...dataGroups.flatMap(g=>g.tools.map(t=>'data-'+t.id))];if(views.includes(params.get('view')||'')){setTab(params.get('view')!);setDate(params.get('view')==='archive'?'any':'24h');setShowDismissed(params.get('view')==='emailed')}},[]);
  useEffect(()=>{if(!user)return;const id=new URLSearchParams(window.location.search).get('job');if(id&&/^[0-9a-f-]{36}$/i.test(id))api<Job>('/jobs/'+id).then(j=>{if(j.archived_at)setNotice('This job is archived and locked.');else setDetail(j)}).catch(e=>setError(e.message));},[user]);
 
  useEffect(()=>{if(!user)return;const id=new URLSearchParams(window.location.search).get('archived');if(id&&/^[0-9a-f-]{36}$/i.test(id))api<Job>('/jobs/'+id).then(j=>{if(j.archived_at)setNotice('Status saved. The job is archived and permanently locked.')}).catch(e=>setError(e.message));},[user]);
@@ -138,7 +140,7 @@ export default function Home(){
  function listParams(){const params=new URLSearchParams({q:query,date,level,mode,page:String(page),sort,view:tab,show_dismissed:String(showDismissed)});if(usState)params.set('state',usState);if(titleFamily)params.set('title',titleFamily);return params}
  // Quietly re-reads the current list (same tab, filters, order and page) without a loading state, so scroll position is kept.
  async function reconcile(){const seq=++listSeq.current;try{const x=await api<JobList>('/jobs?'+listParams());if(seq!==listSeq.current)return;if(!x.items.length&&page>1&&(page-1)*25>=x.total){setPage(p=>p-1);return}setItems(x.items);setTotal(x.total);if(x.facets)setFacets(x.facets)}catch{/* the optimistic list stays until the next refresh */}}
- function choose(value:string){if(value.startsWith('data-'))window.history.replaceState(null,'','?view='+value);setDate(value==='archive'?'any':'24h');if(['emailed','archive'].includes(value)){setQ('');setQuery('');setLevel('');setMode('');setUsState('');setTitleFamily('')}setShowDismissed(value==='emailed');setTab(value);setPage(1);setDetail(null);setNotice('')}
+ function choose(value:string){window.history.replaceState(null,'','?view='+value);setDate(value==='archive'?'any':'24h');if(['emailed','archive'].includes(value)){setQ('');setQuery('');setLevel('');setMode('');setUsState('');setTitleFamily('')}setShowDismissed(value==='emailed');setTab(value);setPage(1);setDetail(null);setNotice('')}
 
  async function save(job:Job,stage?:string){try{await api('/jobs/'+job.id+'/saved',{method:'PUT',body:JSON.stringify({saved:stage?true:!job.saved,stage:stage||'saved'})});setVersion(v=>v+1);setNotice(stage?'Application status updated.':job.saved?'Job removed from saved.':'Job saved.')}catch(e){setError((e as Error).message)}}
 
@@ -189,11 +191,12 @@ export default function Home(){
 
  const labels:Record<string,string>={workflow:'Daily workflow',archive:'Archive',emailed:'Emailed jobs',matches:'All opportunities',saved:'Saved jobs',review:'Needs review',sources:'Source coverage',runs:'Collection runs',intake:'Resume & profile',applications:'Application checks',observability:'Observability',admin:'Admin console',quality:'Data quality',model:'Data model',governance:'Data governance',account:'Account','data-slack':'Slack notifications',...Object.fromEntries(dataGroups.flatMap(g=>g.tools.map(t=>['data-'+t.id,t.name])))};
 
- // The pane's group (panel.mjs): its eyebrow and headings take that group's accent, as the site's pages do.
- const group=viewGroup(tab),groupLabel=group==='account'?'Account':group==='data'?'Data management':'Job Search';
+ // The pane's group (panel.mjs): its eyebrow and headings take that group's accent, as the site's pages do. On an
+ // admin view the group is Admin: the header says so, and the panel wears the standard groups without a product group.
+ const group=viewGroup(tab),groupLabel=(GROUP_LABELS as Record<string,string>)[group]||PRODUCT;
 
- return <HubLinksContext.Provider value={{links,operator:admin}}><div className="brand-page"><a className="skip" href="#main">Skip to content</a><BrandHeader/><div className="shell"><MotionScene loading={loading} saving={!!busyJob} label={labels[tab]}/>
- <SidePanel user={user} links={links} dataManagement={admin&&dataManagementEnabled} tab={tab} own={appPath('/')} signIn={signIn||appPath('/')} ready={!!session} signingOut={signingOut} choose={choose} onSignOut={signOut} onEnquiry={()=>setEnquiry(true)}/>
+ return <HubLinksContext.Provider value={{links,operator:admin}}><div className="brand-page"><a className="skip" href="#main">Skip to content</a><BrandHeader product={groupLabel==='Account'?PRODUCT:groupLabel}/><div className="shell"><MotionScene loading={loading} saving={!!busyJob} label={labels[tab]}/>
+ <SidePanel user={user} links={links} tab={tab} own={appPath('/')} signIn={signIn||appPath('/')} ready={!!session} signingOut={signingOut} choose={choose} onSignOut={signOut} onEnquiry={()=>setEnquiry(true)}/>
 
  <main id="main" className="pane" data-group={group}>
  {session?.features?.maintenance&&<p className="notice" role="status">Scheduled maintenance · Changes to jobs, profiles and applications are temporarily disabled.</p>}

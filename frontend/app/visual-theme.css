@@ -80,12 +80,12 @@ a{color:inherit}.brand-page a:focus-visible,.brand-page button:focus-visible{out
 h1,h2,h3{color:var(--ink-block)}h1{font-weight:800}h2,h3{font-weight:750}
 strong,b,th,summary,legend,label{font-weight:700}
 .muted,.small,.filter-note,.page-heading p,.job-meta,.company-line,.company-line span,.result-line,.pagination,dt,.account-panel>p,.account-facts dt,.description,.ac-caption,.ac-source,.ac-note,.ac-toolbar p,.job-next-action p,.empty,.private-note,.overview-intro p,.overview-step p,.source-state,.source-stages span,.collection-source small,.intake-panel small,.hint,.login-form .hint,.signin-tags,.signin-card p{color:var(--ink-muted)}
-.pane[data-group="product"]{--group-accent:var(--accent-product)}.pane[data-group="account"]{--group-accent:var(--accent-account)}.pane[data-group="data"]{--group-accent:var(--accent-tools)}
+.pane[data-group="product"]{--group-accent:var(--accent-product)}.pane[data-group="account"]{--group-accent:var(--accent-account)}.pane[data-group="admin"]{--group-accent:var(--accent-tools)}.pane[data-group="data"]{--group-accent:var(--accent-data)}
 .pane h1,.pane h2,.pane .eyebrow,.pane .overview-kicker,.pane .monitor-heading .eyebrow{color:var(--group-accent,var(--ink-block))}
 .pane .page-heading .eyebrow{display:inline-block;background:transparent;border:0;padding:0;margin-bottom:6px;font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
 .pane .empty h2,.pane .job-next-action summary,.pane .collection-panel summary{color:var(--ink-block)}
 th,.status-heading,.footer-cols h2,.ac-table th,.eyebrow{color:var(--ink-block);font-weight:800;letter-spacing:.08em;text-transform:uppercase}
-.pane .eyebrow--product{color:var(--accent-product)}.pane .eyebrow--account{color:var(--accent-account)}.pane .eyebrow--data,.pane .eyebrow--tools{color:var(--accent-tools)}.pane .eyebrow--docs{color:var(--accent-docs)}
+.pane .eyebrow--product{color:var(--accent-product)}.pane .eyebrow--account{color:var(--accent-account)}.pane .eyebrow--admin,.pane .eyebrow--tools{color:var(--accent-tools)}.pane .eyebrow--data{color:var(--accent-data)}.pane .eyebrow--docs{color:var(--accent-docs)}
 .signin-card .eyebrow{color:var(--accent-account)}.detail-modal .eyebrow{color:var(--accent-product)}.detail-modal .eyebrow--account{color:var(--accent-account)}
 .filters label{color:var(--ink-block);font-weight:700;font-size:13px}.filter-name{display:inline-flex;align-items:center;gap:6px}.filters .search{color:var(--ink-block)}.filters select{font-weight:600;color:var(--ink)}
 .dismissed-filter{font-weight:700;color:var(--ink-block)}.dismissed-filter .side__icon{margin-left:4px}

@@ -27,7 +27,7 @@ import {Gauge, Info, RefreshCw, TriangleAlert} from 'lucide-react';
 import './admin-console.css';
 import {MotionIcon, type IconName, type Motion} from './Icons';
 import {api, describeError} from './session';
-import {barRows, CHART_BOX, funnelBars, labelIndexes, shapeSeries, sparkline, stackSegments} from './admin-charts.mjs';
+import {barRows, CHART_BOX, funnelBars, labelIndexes, shapeSeries, SPARK_BOX, sparkline, stackSegments, tone} from './admin-charts.mjs';
 
 type Row=Record<string,string|number|null>;
 type Notes=Record<string,string>;
@@ -77,11 +77,26 @@ function NoChart({children}:{children:React.ReactNode}){
  * the legend: a swatch, a name and the exact value under the pointer or the keyboard cursor (the
  * last day until something is hovered or the arrow keys move it). For anyone who cannot see it, the
  * svg has a one-sentence label and the same numbers follow as a table only a screen reader reads.
+ *
+ * The chart is drawn at its card's own width (measured, and measured again when the card changes
+ * size) and a fixed 140px height, so nothing is scaled: the axis labels stay 13px in one column or
+ * three. A single series takes the panel's accent; several are told apart by the ten tones.
  */
 function Chart({title,series,labels,unit='',integer=true,empty='No day in this range has anything to show.'}:
  {title:string;series:Series[];labels:string[];unit?:string;integer?:boolean;empty?:React.ReactNode}){
  const [active,setActive]=useState<number|null>(null);
- const shape=useMemo(()=>shapeSeries(series,CHART_BOX,{integer}),[series,integer]);
+ const [card,setCard]=useState<HTMLElement|null>(null);
+ const [width,setWidth]=useState<number>(CHART_BOX.width);
+ useEffect(()=>{
+  if(!card)return;
+  const fit=()=>setWidth(Math.max(200,Math.round(card.clientWidth))||CHART_BOX.width);
+  fit();
+  if(typeof ResizeObserver==='undefined')return;
+  const watch=new ResizeObserver(fit);watch.observe(card);
+  return()=>watch.disconnect();
+ },[card]);
+ const box=useMemo(()=>({...CHART_BOX,width}),[width]);
+ const shape=useMemo(()=>shapeSeries(series,box,{integer}),[series,box,integer]);
  const move=useCallback((step:number)=>setActive(current=>{
   const last=shape.length-1;
   if(last<0)return null;
@@ -90,17 +105,18 @@ function Chart({title,series,labels,unit='',integer=true,empty='No day in this r
  }),[shape.length]);
  if(!shape.length||!series.some(item=>item.values.length))return <NoChart>{empty}</NoChart>;
  const index=active===null?shape.length-1:Math.min(active,shape.length-1);
- const marks=labelIndexes(shape.length,4);
+ const marks=labelIndexes(shape.length,box.width<330?3:4);
  const step=shape.length>1?shape.plotWidth/(shape.length-1):shape.plotWidth;
  const peak=Math.max(...series.map(item=>Math.max(0,...item.values)));
+ const toneOf=(item:Series)=>shape.series.length===1?'ac-tone-panel':'ac-tone'+(item.tone||1);
  const label=title+': '+shape.length+(shape.length===1?' day':' days')+' from '+labels[0]+' to '+labels[shape.length-1]
   +', '+series.map(item=>item.label.toLowerCase()+' highest '+num(Math.max(0,...item.values))+unit).join(', ')+'.';
- return <figure className="ac-chart">
+ return <figure className="ac-chart" ref={setCard}>
   <p className="ac-readout" aria-live="polite"><span className="ac-readout-day">{labels[index]}</span>
-   {series.map(item=><span key={item.key} className="ac-readout-item">
-    <span className={'ac-swatch ac-tone'+(item.tone||1)+(item.dashed?' ac-swatch-dashed':'')} aria-hidden="true"/>
+   {series.map(item=><span key={item.key} className={'ac-readout-item '+toneOf(item)}>
+    <span className={'ac-swatch'+(item.dashed?' ac-swatch-dashed':'')} aria-hidden="true"/>
     {item.label} <strong className="ac-num">{num(item.values[index]??0)}{unit}</strong></span>)}</p>
-  <svg viewBox={'0 0 '+CHART_BOX.width+' '+CHART_BOX.height} className="ac-svg" role="img" tabIndex={0} aria-label={label}
+  <svg viewBox={'0 0 '+box.width+' '+box.height} className="ac-svg" role="img" tabIndex={0} aria-label={label}
    onMouseLeave={()=>setActive(null)} onBlur={()=>setActive(null)}
    onKeyDown={event=>{
     const keys:Record<string,number>={ArrowLeft:-1,ArrowRight:1,Home:-shape.length,End:shape.length};
@@ -108,20 +124,20 @@ function Chart({title,series,labels,unit='',integer=true,empty='No day in this r
     event.preventDefault();move(keys[event.key]);
    }}>
    {shape.ticks.map(tick=><g key={tick}>
-    <line x1={CHART_BOX.left} x2={CHART_BOX.width-CHART_BOX.right} y1={shape.y(tick)} y2={shape.y(tick)} className="ac-grid"/>
-    <text x={CHART_BOX.left-8} y={shape.y(tick)+4} className="ac-axis-label" textAnchor="end">{num(tick,1)}</text>
+    <line x1={box.left} x2={box.width-box.right} y1={shape.y(tick)} y2={shape.y(tick)} className="ac-grid"/>
+    <text x={box.left-8} y={shape.y(tick)+4} className="ac-axis-label" textAnchor="end">{num(tick,1)}</text>
    </g>)}
-   {shape.series.length===1&&<path d={shape.series[0].area} className={'ac-area ac-tone'+(shape.series[0].tone||1)}/>}
+   {shape.series.length===1&&<path d={shape.series[0].area} className={'ac-area '+toneOf(shape.series[0])}/>}
    {shape.series.map(item=><path key={item.key} d={item.line} vectorEffect="non-scaling-stroke"
-    className={'ac-line ac-tone'+(item.tone||1)+(item.dashed?' ac-line-dashed':'')}/>)}
-   <line x1={CHART_BOX.left} x2={CHART_BOX.width-CHART_BOX.right} y1={shape.baseline} y2={shape.baseline} className="ac-axis"/>
-   {marks.map(mark=><text key={mark} x={shape.x(mark)} y={CHART_BOX.height-11} className="ac-axis-label"
+    className={'ac-line '+toneOf(item)+(item.dashed?' ac-line-dashed':'')}/>)}
+   <line x1={box.left} x2={box.width-box.right} y1={shape.baseline} y2={shape.baseline} className="ac-axis"/>
+   {marks.map(mark=><text key={mark} x={shape.x(mark)} y={box.height-7} className="ac-axis-label"
     textAnchor={mark===0?'start':mark===shape.length-1?'end':'middle'}>{labels[mark]}</text>)}
-   <line x1={shape.x(index)} x2={shape.x(index)} y1={CHART_BOX.top} y2={shape.baseline} className="ac-cursor"/>
-   {shape.series.map(item=>item.points[index]?<circle key={item.key} cx={shape.x(index)} cy={item.points[index].y} r="4"
-    className={'ac-dot ac-tone'+(item.tone||1)}/>:null)}
+   <line x1={shape.x(index)} x2={shape.x(index)} y1={box.top} y2={shape.baseline} className="ac-cursor"/>
+   {shape.series.map(item=>item.points[index]?<circle key={item.key} cx={shape.x(index)} cy={item.points[index].y} r="3.5"
+    className={'ac-dot '+toneOf(item)}/>:null)}
    {shape.series[0].points.map(point=><rect key={point.index} className="ac-hit"
-    x={Math.max(0,shape.x(point.index)-step/2)} y={0} width={Math.max(step,6)} height={CHART_BOX.height}
+    x={Math.max(0,shape.x(point.index)-step/2)} y={0} width={Math.max(step,6)} height={box.height}
     onMouseEnter={()=>setActive(point.index)}/>)}
   </svg>
   <table className="ac-sr"><caption>{title}{peak?'':' (nothing above zero in this range)'}</caption>
@@ -131,27 +147,27 @@ function Chart({title,series,labels,unit='',integer=true,empty='No day in this r
  </figure>;
 }
 
-/** A ranked comparison drawn as bars, so the shape is readable without reading every number. */
+/** A ranked comparison drawn as bars, so the shape is readable without reading every number. The rows cycle the tones. */
 function Bars({rows,empty='Nothing recorded in this range.',highlight}:
  {rows:{key:string;label:string;value:number;text?:string;muted?:boolean}[];empty?:React.ReactNode;highlight?:string}){
  if(!rows.length)return <NoChart>{empty}</NoChart>;
- return <ul className="ac-bars">{barRows(rows).map(row=>
+ return <ul className="ac-bars">{barRows(rows).map((row,order)=>
   <li key={row.key} className={highlight&&row.key===highlight?'ac-bar-on':undefined}>
    <span className="ac-bar-label" title={row.label}>{row.label}</span>
-   <span className="ac-bar-track"><span className={'ac-bar-fill'+(row.muted?' ac-bar-muted':'')} style={{width:row.width+'%'}}/></span>
+   <span className="ac-bar-track"><span className={'ac-bar-fill ac-tone'+tone(order)+(row.muted?' ac-bar-muted':'')} style={{width:row.width+'%'}}/></span>
    <span className="ac-bar-value ac-num">{row.text??num(row.value)}</span></li>)}</ul>;
 }
 
-/** A status mix as one stacked bar: every class in proportion, with its share beside it. */
+/** A status mix as one stacked bar: every class in proportion, with its share beside it in the class's tone. */
 function Stack({parts,empty='Nothing recorded in this range.'}:{parts:{key:string;label:string;value:number}[];empty?:React.ReactNode}){
  const {total,segments}=stackSegments(parts);
  if(!total)return <NoChart>{empty}</NoChart>;
  return <div className="ac-stackwrap">
   <div className="ac-stack" role="img" aria-label={segments.map(part=>part.label+' '+pct(part.share)).join(', ')}>
-   {segments.filter(part=>part.width>0).map((part,order)=><span key={part.key} className={'ac-stack-part ac-tone'+((order%6)+1)}
+   {segments.filter(part=>part.width>0).map((part,order)=><span key={part.key} className={'ac-stack-part ac-tone'+tone(order)}
     style={{width:part.width+'%'}}><span className="ac-sr">{part.label} {pct(part.share)}</span></span>)}</div>
-  <ul className="ac-legend">{segments.filter(part=>part.value>0).map((part,order)=><li key={part.key}>
-   <span className={'ac-swatch ac-tone'+((order%6)+1)} aria-hidden="true"/>{part.label}
+  <ul className="ac-legend">{segments.filter(part=>part.value>0).map((part,order)=><li key={part.key} className={'ac-tone'+tone(order)}>
+   <span className="ac-swatch" aria-hidden="true"/>{part.label}
    <strong className="ac-num">{num(part.value)}</strong><span className="ac-num">{pct(part.share)}</span></li>)}</ul>
  </div>;
 }
@@ -159,23 +175,23 @@ function Stack({parts,empty='Nothing recorded in this range.'}:{parts:{key:strin
 /** The funnel: a step per row with the share of the step above it printed between the two. */
 function Funnel({steps,marks}:{steps:{step:string;value:number;of_previous:number|null}[];marks?:Record<string,string>}){
  if(!steps.length)return <NoChart>No funnel can be drawn without a visitor count.</NoChart>;
- return <ol className="ac-funnel">{funnelBars(steps).map(step=><li key={step.step}>
+ return <ol className="ac-funnel">{funnelBars(steps).map((step,order)=><li key={step.step}>
   {step.of_previous===null?null:<span className="ac-funnel-gap ac-num" aria-hidden="true">↓ {pct(step.of_previous)}</span>}
   <span className="ac-funnel-row">
    <span className="ac-bar-label">{step.step}{marks?.[step.step]?<em className="ac-mark">{marks[step.step]}</em>:null}</span>
-   <span className="ac-bar-track"><span className="ac-bar-fill" style={{width:step.width+'%'}}/></span>
+   <span className="ac-bar-track"><span className={'ac-bar-fill ac-tone'+tone(order)} style={{width:step.width+'%'}}/></span>
    <span className="ac-bar-value ac-num">{num(step.value)}{step.of_previous===null?'':' · '+pct(step.of_previous)+' of the step above'}</span>
   </span></li>)}</ol>;
 }
 
-/** A small line and the value it ends on, for a measurement that is only interesting as a shape. */
+/** A small line and the value it ends on, for a measurement that is only interesting as a shape. It takes the panel's accent. */
 function Spark({values,label,unit='',current,empty}:{values:number[];label:string;unit?:string;current?:number|null;empty?:React.ReactNode}){
- const line=sparkline(values,{width:220,height:46});
+ const line=sparkline(values,SPARK_BOX);
  if(!line.path)return <NoChart>{empty||'No sample was recorded.'}</NoChart>;
  const now=current===undefined?line.current:current;
  return <div className="ac-spark">
-  <svg viewBox="0 0 220 46" role="img" aria-label={label+': '+values.length+' samples, now '+num(now,3)+unit+', highest '+num(line.top,3)+unit}>
-   <path d={line.path} className="ac-line ac-tone1" vectorEffect="non-scaling-stroke"/></svg>
+  <svg viewBox={'0 0 '+SPARK_BOX.width+' '+SPARK_BOX.height} role="img" aria-label={label+': '+values.length+' samples, now '+num(now,3)+unit+', highest '+num(line.top,3)+unit}>
+   <path d={line.path} className="ac-line ac-tone-panel" vectorEffect="non-scaling-stroke"/></svg>
   <p><strong className="ac-num">{num(now,3)}{unit}</strong><span>now · highest {num(line.top,3)}{unit}</span></p>
  </div>;
 }
@@ -185,9 +201,12 @@ function Card({title,note,children,wide}:{title:string;note?:React.ReactNode;chi
   <h3>{title}</h3>{children}{note?<p className="ac-caption">{note}</p>:null}</article>;
 }
 
+/** The accent a panel wears: one of the shell's group accents for its titles, figures, summary line and single-series charts. */
+type PanelAccent='relax'|'jobs'|'account'|'start';
+
 /** A panel's heading carries a code-drawn icon with one calm motion, as every heading of a list of panels does in the standard shell. */
-function Panel({icon,motion,title,body,children}:{icon:IconName;motion:Motion;title:string;body:Base;children:React.ReactNode}){
- return <section className="ac-panel" aria-labelledby={'ac-'+body.panel}>
+function Panel({icon,motion,title,body,accent,children}:{icon:IconName;motion:Motion;title:string;body:Base;accent:PanelAccent;children:React.ReactNode}){
+ return <section className={'ac-panel ac-panel--'+accent} aria-labelledby={'ac-'+body.panel}>
   <header><span className="ac-icon"><MotionIcon name={icon} motion={motion}/></span>
    <div><h2 id={'ac-'+body.panel}>{title}</h2>
     <p className="ac-source">Source: {body.source}{body.fresh_at?' · newest record '+when(body.fresh_at):''}</p></div>
@@ -204,7 +223,7 @@ function Panel({icon,motion,title,body,children}:{icon:IconName;motion:Motion;ti
 
 // ----- per-product shaping ----------------------------------------------------------------------
 
-const toneFor=(host:string,products:Product[])=>{const found=products.findIndex(item=>item.host===host);return (found<0?products.length:found)%6+1};
+const toneFor=(host:string,products:Product[])=>{const found=products.findIndex(item=>item.host===host);return tone(found<0?products.length:found)};
 const nameFor=(host:string,products:Product[])=>products.find(item=>item.host===host)?.name||host;
 
 /** One value per day for one host, with the days a host saw nothing filled in as zero. */
@@ -270,7 +289,7 @@ function TrafficPanel({body,product,products,bots}:{body:Traffic;product:string;
   .map(row=>({key:s(row,'host')+s(row,'path_group'),label:(one?'':nameFor(s(row,'host'),products)+' ')+s(row,'path_group'),
    value:n(row,'p95_ms'),text:num(n(row,'p95_ms'))+' ms · avg '+num(n(row,'avg_ms'))+' ms'})),[body.slowest,one,product,products]);
  const scope=one?nameFor(product,products):'every product';
- return <Panel icon="chart" motion="bounce" title="Web traffic" body={body}>
+ return <Panel icon="chart" motion="bounce" title="Web traffic" body={body} accent="relax">
   <Card title={'Requests per day · '+scope}
    note={<>Requests from people, one line per product. {bots?'The dashed line is bot traffic.':'Bots are excluded; turn on “Show bots” to draw them.'}</>}>
    <Chart title="Requests per day" series={requests} labels={labels}/></Card>
@@ -311,7 +330,7 @@ function AccountsPanel({body}:{body:Accounts}){
  ],[body.daily,body.self_daily,days]);
  const signins=useMemo(()=>{
   const outcomes=[...new Set((body.signins||[]).map(row=>s(row,'outcome')))].sort();
-  return outcomes.map((outcome,order)=>({key:outcome,label:outcome,tone:order%6+1,
+  return outcomes.map((outcome,order)=>({key:outcome,label:outcome,tone:tone(order),
    values:daySeries((body.signins||[]).filter(row=>s(row,'outcome')===outcome),days,'events')}));
  },[body.signins,days]);
  const outcomes=useMemo(()=>{
@@ -327,7 +346,7 @@ function AccountsPanel({body}:{body:Accounts}){
   {key:'verified',label:'Verified',value:totals?.verified||0},
   {key:'unverified',label:'Not verified',value:Math.max(0,(totals?.accounts||0)-(totals?.verified||0))},
  ];
- return <Panel icon="signin" motion="wiggle" title="Accounts" body={body}>
+ return <Panel icon="signin" motion="wiggle" title="Accounts" body={body} accent="account">
   <Card title="Sign-ups per day" note="A sign-up is a self-service account. The dashed line is every account created, console and seed accounts included, and is only there for comparison.">
    <Chart title="Sign-ups per day" series={signups} labels={labels} empty="No account was created in this range."/></Card>
   <Card title="Sign-in attempts per day" note="Recorded sign-in attempts by outcome, every account included.">
@@ -375,7 +394,7 @@ function MonetizationPanel({body,product,products}:{body:Money;product:string;pr
  const marks=one?{'Sign-ups':'all products','Verified':'all products','Signed in':'all products'}:undefined;
  const days=useMemo(()=>[...new Set((body.enquiries||[]).map(row=>s(row,'day')))].sort(),[body.enquiries]);
  const enquiries=useMemo(()=>[{key:'enquiries',label:'Enquiries',values:daySeries(body.enquiries||[],days,'enquiries'),tone:1}],[body.enquiries,days]);
- return <Panel icon="check" motion="pulse" title="Conversion and usage" body={body}>
+ return <Panel icon="check" motion="pulse" title="Conversion and usage" body={body} accent="jobs">
   <Card title={'From a visit to a signed-in account · '+(one?nameFor(product,products):'every product')}
    note={<>{body.funnel_note} {one?'Only the first step can be read per product: an account is not tied to one.':''}</>}>
    <Funnel steps={funnel} marks={marks}/></Card>
@@ -410,7 +429,7 @@ function MachinePanel({body}:{body:Machine}){
  const memory=(services.services||[]).map(service=>({key:service.job,label:service.job,value:service.memory_mb||0,
   text:num(service.memory_mb,1)+' MB'})).sort((left,right)=>right.value-left.value);
  const gpuDaily=(gpu.daily||[]).map(row=>n(row,'avg_utilisation'));
- return <Panel icon="orbit" motion="spin" title="Machine" body={body}>
+ return <Panel icon="orbit" motion="spin" title="Machine" body={body} accent="start">
   <Card title="Service CPU, last hour" note={services.available?'Every scraped service together, one sample a minute.':undefined}>
    {services.available?<Spark values={samples} label="Service CPU cores over the last hour" unit=" cores"
     empty="Prometheus answered, but it has no range for this expression yet."/>:<NoChart>{services.message}</NoChart>}</Card>
@@ -507,7 +526,7 @@ export default function AdminConsole({version}:{version:number}){
  const cadence=minutes%60?minutes+' minutes':minutes===60?'hour':minutes/60+' hours';
  return <div className="admin-console">
   <div className="ac-toolbar">
-   <div><span className="eyebrow eyebrow--product">Administrator console</span>
+   <div><span className="eyebrow eyebrow--admin">Administrator console</span>
     <p>Traffic, accounts, conversion and machine load for every Bagala product, as charts, from the shared warehouse and the cluster&rsquo;s own metrics.</p></div>
    <label>Date range<select aria-label="Date range" value={days} onChange={event=>setDays(Number(event.target.value))}>
     {(data?.ranges||[7,30,90]).map(value=><option key={value} value={value}>{RANGE_LABEL[value]||value+' days'}</option>)}</select></label>
