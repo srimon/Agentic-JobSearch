@@ -5,7 +5,7 @@
  */
 import type {ReactNode} from 'react';
 
-export type IconName='search'|'book'|'chat'|'cursor'|'mail'|'check'|'signin'|'upload'|'pencil'|'chart'|'shield'|'lock'|'help'|'document'|'orbit'|'code'|'bookmark'|'archive'|'clock'|'database'|'grid'|'gauge'|'signout'|'globe'|'sliders'|'calendar'|'layers'|'map'|'tag';
+export type IconName='search'|'book'|'chat'|'cursor'|'mail'|'check'|'signin'|'upload'|'pencil'|'chart'|'shield'|'lock'|'help'|'document'|'orbit'|'code'|'bookmark'|'archive'|'inbox'|'clock'|'database'|'grid'|'gauge'|'signout'|'globe'|'sliders'|'calendar'|'layers'|'map'|'tag';
 export type Motion='pulse'|'sway'|'spin'|'nudge'|'bounce'|'orbit'|'wiggle';
 
 const PATHS:Record<IconName,ReactNode>={
@@ -27,6 +27,7 @@ const PATHS:Record<IconName,ReactNode>={
  code:<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13.5 5l-3 14"/>,
  bookmark:<path d="M6.5 4h11v16l-5.5-4-5.5 4z"/>,
  archive:<><rect x="3" y="4.5" width="18" height="4.5" rx="1"/><path d="M4.5 9v10h15V9"/><path d="M10 13h4"/></>,
+ inbox:<><path d="M4 15l2.5-6h11l2.5 6v4.5H4z"/><path d="M4 15h4.5l1.5 2.5h4L15.5 15H20"/><path d="M12 3v6M9.5 6.5L12 9l2.5-2.5"/></>,
  clock:<><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></>,
  database:<><ellipse cx="12" cy="6" rx="7.5" ry="3"/><path d="M4.5 6v12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3V6"/><path d="M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3"/></>,
  grid:<><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></>,

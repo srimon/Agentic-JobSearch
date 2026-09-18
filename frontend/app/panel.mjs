@@ -33,7 +33,7 @@ const entry = (id, label, icon, motion, extra = {}) => ({id, label, icon, motion
 const trailing = (url) => (url.endsWith('/') ? url : url + '/');
 
 /**
- * The standard groups, as platform/brand/panel.json gives them on 17 Sep 2026: labels and addresses verbatim, in its
+ * The standard groups, as platform/brand/panel.json gives them on 18 Sep 2026: labels and addresses verbatim, in its
  * order; the icons and motions are this product's. `sub` nests a labelled sub-group inside an entry; the sub-group
  * whose id is 'data' is the fold.
  */
@@ -69,6 +69,7 @@ export const STANDARD = {
       {label: 'Explain', href: PUBLIC.library + '/explain', icon: 'help', motion: 'pulse'},
       {label: 'VectorDB', href: PUBLIC.library + '/vectordb', icon: 'layers', motion: 'orbit'},
       {label: 'Library operations', href: PUBLIC.library + '/operations', icon: 'sliders', motion: 'sway'},
+      {label: 'Book queue', href: PUBLIC.library + '/book-queue', icon: 'inbox', motion: 'nudge'},
       {label: 'Daily workflow', href: PUBLIC.jobs + '?view=workflow', icon: 'clock', motion: 'sway'},
       {label: 'Agents and activity', href: PUBLIC.jobs + '?view=runs', icon: 'orbit', motion: 'spin'},
       {label: 'Data management', icon: 'database', motion: 'nudge', sub: [

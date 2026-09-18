@@ -145,6 +145,10 @@
           "href": "https://bagala.ai/library/reader/operations"
         },
         {
+          "label": "Book queue",
+          "href": "https://bagala.ai/library/reader/book-queue"
+        },
+        {
           "label": "Daily workflow",
           "href": "https://bagala.ai/jobsearch/?view=workflow"
         },

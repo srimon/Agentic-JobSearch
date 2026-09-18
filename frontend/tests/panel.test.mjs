@@ -120,7 +120,7 @@ test('Admin is for administrators only, in both contexts, and is the hub\'s Admi
     assert.deepEqual(labels(group), STANDARD.admin.entries.map((e) => e.label), tab);
     assert.deepEqual(group.entries.map((e) => e.view || e.href || (e.fold ? 'fold' : e.action)), [
       'admin', 'observability',
-      links.library + '/observability', links.library + '/explain', links.library + '/vectordb', links.library + '/operations',
+      links.library + '/observability', links.library + '/explain', links.library + '/vectordb', links.library + '/operations', links.library + '/book-queue',
       'workflow', 'runs', 'fold', 'https://app.slack.com/client/T0BG19JLPF1/C0BGLC0055J',
     ], tab);
     // every in-app entry carries its view as its id (so aria-current can be set from the tab); the links leave the product
@@ -132,6 +132,13 @@ test('Admin is for administrators only, in both contexts, and is the hub\'s Admi
   // the Library reader's pages follow the session's library link, wherever it is; without one they keep the public address
   const local = byId(panelGroups({user: ROOT, links: {library: 'http://localhost:3001/reader/'}}), 'admin');
   assert.equal(local.entries.find((e) => e.label === 'Explain').href, 'http://localhost:3001/reader/explain');
+  // the book queue (the crawler's approvals, 18 Sep 2026) is a Library reader page right after Library operations
+  const queue = local.entries.find((e) => e.label === 'Book queue');
+  assert.equal(queue.href, 'http://localhost:3001/reader/book-queue');
+  assert.equal(queue.id, 'library-book-queue');
+  assert.equal(queue.external, true);
+  assert.equal(queue.view, undefined, 'the queue is the reader\'s page, not a view of this product');
+  assert.equal(labels(local).indexOf('Book queue'), labels(local).indexOf('Library operations') + 1);
   const bare = byId(panelGroups({user: ROOT, links: {}}), 'admin');
   assert.equal(bare.entries.find((e) => e.label === 'VectorDB').href, PUBLIC.library + '/vectordb');
   assert.equal(bare.entries.length, STANDARD.admin.entries.length, 'nothing is dropped when the session gives no links');
